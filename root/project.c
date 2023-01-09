@@ -5,6 +5,6 @@
 
 int main(){
 
-    printf("salam");
+    //printf("salam");
     return 0;
 }
