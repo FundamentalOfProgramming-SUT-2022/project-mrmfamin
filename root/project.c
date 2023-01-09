@@ -4,5 +4,7 @@
 #include <math.h>
 
 int main(){
+
+    printf("salam");
     return 0;
 }
