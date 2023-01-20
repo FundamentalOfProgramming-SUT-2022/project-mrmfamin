@@ -16,6 +16,7 @@ void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
 void get_bf(char ** line, int * type);
 int file_exist(char * path);
+int get_index_of_pos(char * path,int line,int start);
 char * get_path(char ** line);
 char * get_string(char ** line);
 char * read_file(char * path);
@@ -67,33 +68,45 @@ void add_string_to_file(char * path, char * string, int mode){
 
 void insertstr(char * path, char * string, int line, int start){
     char * file_data = read_file(path);
-    int i = 0;
-    int line_counter = 1;
-    int position_counter = 0;
-    while (-1){
-        if(line_counter == line && position_counter == start){
-            break;
-        }
+    int index = get_index_of_pos(path, line, start);
 
-        if(*(file_data + i) == 10){
-            line_counter++;
-            position_counter = 0;
-        }
-
-        position_counter++;
-        i++;
-    }
-    i++;
-    char temp = *(file_data + i);
-    *(file_data + i) = '\0';
+    char temp = *(file_data + index);
+    *(file_data + index) = '\0';
 
     add_string_to_file(path, file_data, 1);
     add_string_to_file(path, string, 2);
 
-    *(file_data + i) = temp;
-    file_data += i;
+    *(file_data + index) = temp;
+    file_data += index;
 
     add_string_to_file(path, file_data, 2);
+}
+
+void removestr(char * path, int line, int start, int size, int type){
+    char * file_data = read_file(path);
+    int index = get_index_of_pos(path, line, start);
+
+    if(type == 1){
+        char temp = *(file_data + index);
+        *(file_data + index) = '\0';
+
+        add_string_to_file(path, file_data, 1);
+
+        *(file_data + index) = temp;
+        file_data += index + size;
+
+        add_string_to_file(path, file_data, 2);
+    }else if(type == 2){
+        char temp = *(file_data + index - size);
+        *(file_data + index - size) = '\0';
+
+        add_string_to_file(path, file_data, 1);
+
+        *(file_data + index - size) = temp;
+        file_data += index;
+
+        add_string_to_file(path, file_data, 2);
+    }
 }
 
 void get_pos(char ** line, int * pos_line, int * pos_start){
@@ -110,7 +123,7 @@ void get_pos(char ** line, int * pos_line, int * pos_start){
 
 void get_size(char ** line, int * size){
     //Go to firs of addres
-    *(line)+=1;
+    *(line)+=6;
 
     //Analyze line and start position
     *size = string_to_int(*line, 1);
@@ -139,6 +152,27 @@ int file_exist(char * path){
     }else{
         return 0;
     }
+}
+
+int get_index_of_pos(char *path,int line,int start){
+    char * file_data = read_file(path);
+    int i = 0;
+    int line_counter = 1;
+    int position_counter = 0;
+    while (-1){
+        if(line_counter == line && position_counter == start){
+            break;
+        }
+
+        if(*(file_data + i) == 10){
+            line_counter++;
+            position_counter = 0;
+        }
+
+        position_counter++;
+        i++;
+    }
+    return ++i;
 }
 
 char * get_path(char ** line){
@@ -305,7 +339,7 @@ int main()
         }else if(strcmp(command, "cat") == 0){
             char * path = get_path(&notAnalyzed);
             puts(read_file(path));
-        }else if(strcmp(command, "removestr")){
+        }else if(strcmp(command, "removestr") == 0){
             char * path = get_path(&notAnalyzed);
             int pos_line;
             int pos_start;
@@ -314,6 +348,8 @@ int main()
             get_size(&notAnalyzed, &size);
             int type;
             get_bf(&notAnalyzed, &type);
+            printf("path: %s, line: %d, start: %d, size: %d, type: %d\n", path, pos_line, pos_start, size, type);
+            removestr(path, pos_line, pos_start, size, type);
         }
     }
 
