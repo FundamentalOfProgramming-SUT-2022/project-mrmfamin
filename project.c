@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <math.h>
@@ -8,6 +9,7 @@
 #define MAX_LINE 5000
 #define MAX_PATH_ADDRESS 500
 #define MAX_STRING 2000
+#define MAX_FIND_ARGS 7
 
 void createfile(char * path);
 void add_string_to_file(char * path, char * string, int mode);
@@ -16,14 +18,17 @@ void removestr(char * path, int line, int start, int size, int type);
 void copystr(char * path, int line, int start, int size, int type);
 void cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
+void find(char ** line, char * path, char * string);
+int wildcard(const char *value, char *wcard);
 void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
 void get_bf(char ** line, int * type);
 int step_to(char * line, char to);
 int file_exist(char * path);
+int folder_exist(char * path);
 int get_index_of_pos(char * path,int line,int start);
 char * get_path(char ** line);
-char * get_string(char ** line);
+char * get_string(char ** line, int effect_on_star);
 char * read_file(char * path);
 long long string_to_int(char * string, int lenght);
 
@@ -186,6 +191,49 @@ void pastestr(char * path, int line, int start){
     add_string_to_file(path, file_data, 2);
 }
 
+void find(char ** line, char * path, char * string){
+    int is_count = 0;
+    int is_at = 0;
+    int is_byword = 0;
+    int is_all = 0;
+    char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+    while(-1){
+        sscanf(*line, "%s", args);
+        (*line) += strlen(args) + 1;
+        if(strcmp(args, "-count") == 0){
+            is_count = 1;
+            break;
+        }else if(strcmp(args, "-at") == 0){
+            is_at = string_to_int(*line, step_to(*line, ' '));
+            *line += step_to(*line, ' ') + 1;
+            if(is_byword){
+                break;
+            }
+        }else if(strcmp(args, "-byword") == 0){
+            is_byword = 1;
+            if(is_all || is_at){
+                break;
+            }
+        }else if(strcmp(args, "-all") == 0){
+            is_all = 1;
+            if(is_byword){
+                break;
+            }
+        }
+        if(*((*line) - 1) != ' '){
+            break;
+        }
+    }
+    char * file_data = read_file(path);
+//    int i = 0;
+//    while(-1){
+//        if(*(file_data + i) == *(string + i)){
+//
+//        }
+//        i++;
+//    }
+}
+
 void get_pos(char ** line, int * pos_line, int * pos_start){
     //Go to firs of addres
     *(line)+=6;
@@ -237,6 +285,39 @@ int file_exist(char * path){
     if(check) {
         return 1;
     }else{
+        char * path_to_check = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
+        int i = 0;
+        while(*path != '\0'){
+            if(*path == '\\'){
+                if(*(path + 1) == '\"'){
+                    *(path_to_check + i) = *(path +1);
+                    i++;
+                    path += 2;
+                    continue;
+                }
+            }
+            if(*path == '/'){
+                *(path_to_check + i) = '\0';
+                if(!folder_exist(path_to_check)){
+                    puts("Invalid Address");
+                    return 0;
+                }
+            }
+            *(path_to_check + i) = *path;
+            i++;
+            path += 1;
+        }
+        puts("File isn't exist");
+        return 0;
+    }
+}
+
+int folder_exist(char * path){
+    DIR* dir = opendir(path);
+    if (dir) {
+        closedir(dir);
+        return 1;
+    } else {
         return 0;
     }
 }
@@ -309,7 +390,7 @@ char * get_path(char ** line){
     return path;
 }
 
-char * get_string(char ** line){
+char * get_string(char ** line, int effect_on_star){
     //end types
     const char end_str_with[] = {' ', '\"'};
 
@@ -330,7 +411,7 @@ char * get_string(char ** line){
     int i = 0;
     while(**line != end_str_with[ending_type] && **line != '\0'){
         if(**line == '\\'){
-            if(*((*line)+1) == '\\' || *((*line)+1) == '\"'){
+            if(*((*line)+1) == '\\' || *((*line)+1) == '\"' || *((*line)+1) == '*'){
                 *(string + i) = *((*line)+1);
                 i++;
                 *line += 2;
@@ -341,6 +422,12 @@ char * get_string(char ** line){
                 *line += 2;
                 continue;
             }
+        }
+        if(effect_on_star && *((*line) + i) == '*'){
+            *(string + i) = '*';
+            i++;
+            *(line) += 1;
+            continue;
         }
         *(string + i) = **line;
         i++;
@@ -417,55 +504,69 @@ int main()
         }else if(strcmp(command, "insertstr") == 0){
             char * path = get_path(&notAnalyzed);
             if(file_exist(path)){
-                char * string = get_string(&notAnalyzed);
+                char * string = get_string(&notAnalyzed, 0);
                 int pos_line;
                 int pos_start;
                 get_pos(&notAnalyzed, &pos_line, &pos_start);
 
                 insertstr(path, string, pos_line, pos_start);
-            }else{
-                puts("File isn't exist");
             }
         }else if(strcmp(command, "cat") == 0){
             char * path = get_path(&notAnalyzed);
-            puts(read_file(path));
+            if(file_exist(path)){
+                puts(read_file(path));
+            }
         }else if(strcmp(command, "removestr") == 0){
             char * path = get_path(&notAnalyzed);
-            int pos_line;
-            int pos_start;
-            get_pos(&notAnalyzed, &pos_line, &pos_start);
-            int size;
-            get_size(&notAnalyzed, &size);
-            int type;
-            get_bf(&notAnalyzed, &type);
-            removestr(path, pos_line, pos_start, size, type);
+            if(file_exist(path)) {
+                int pos_line;
+                int pos_start;
+                get_pos(&notAnalyzed, &pos_line, &pos_start);
+                int size;
+                get_size(&notAnalyzed, &size);
+                int type;
+                get_bf(&notAnalyzed, &type);
+                removestr(path, pos_line, pos_start, size, type);
+            }
         }else if(strcmp(command, "copystr") == 0){
             char * path = get_path(&notAnalyzed);
-            int pos_line;
-            int pos_start;
-            get_pos(&notAnalyzed, &pos_line, &pos_start);
-            //printf("%d %d\n", pos_line, pos_start);
-            int size;
-            get_size(&notAnalyzed, &size);
-            int type;
-            get_bf(&notAnalyzed, &type);
-            copystr(path, pos_line, pos_start, size, type);
+            if(file_exist(path)){
+                int pos_line;
+                int pos_start;
+                get_pos(&notAnalyzed, &pos_line, &pos_start);
+                //printf("%d %d\n", pos_line, pos_start);
+                int size;
+                get_size(&notAnalyzed, &size);
+                int type;
+                get_bf(&notAnalyzed, &type);
+                copystr(path, pos_line, pos_start, size, type);
+            }
         }else if(strcmp(command, "cutstr") == 0){
             char * path = get_path(&notAnalyzed);
-            int pos_line;
-            int pos_start;
-            get_pos(&notAnalyzed, &pos_line, &pos_start);
-            int size;
-            get_size(&notAnalyzed, &size);
-            int type;
-            get_bf(&notAnalyzed, &type);
-            cutstr(path, pos_line, pos_start, size, type);
+            if(file_exist(path)) {
+                int pos_line;
+                int pos_start;
+                get_pos(&notAnalyzed, &pos_line, &pos_start);
+                int size;
+                get_size(&notAnalyzed, &size);
+                int type;
+                get_bf(&notAnalyzed, &type);
+                cutstr(path, pos_line, pos_start, size, type);
+            }
         }else if(strcmp(command, "pastestr") == 0){
             char * path = get_path(&notAnalyzed);
-            int pos_line;
-            int pos_start;
-            get_pos(&notAnalyzed, &pos_line, &pos_start);
-            pastestr(path, pos_line, pos_start);
+            if(file_exist(path)){
+                int pos_line;
+                int pos_start;
+                get_pos(&notAnalyzed, &pos_line, &pos_start);
+                pastestr(path, pos_line, pos_start);
+            }
+        }else if(strcmp(command, "find") == 0){
+            char * string = get_string(&notAnalyzed, 1);
+            char * path = get_path(&notAnalyzed);
+            if(file_exist(path)){
+                find(notAnalyzed, path, string);
+            }
         }
     }
 
