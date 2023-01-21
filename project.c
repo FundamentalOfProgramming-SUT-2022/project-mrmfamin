@@ -10,6 +10,8 @@
 #define MAX_PATH_ADDRESS 500
 #define MAX_STRING 2000
 #define MAX_FIND_ARGS 7
+#define MAX_FIND_INDEX 100
+
 
 void createfile(char * path);
 void add_string_to_file(char * path, char * string, int mode);
@@ -19,7 +21,8 @@ void copystr(char * path, int line, int start, int size, int type);
 void cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
 void find(char ** line, char * path, char * string);
-int wildcard(const char *value, char *wcard);
+int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
+void return_find();
 void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
 void get_bf(char ** line, int * type);
@@ -46,7 +49,7 @@ void createfile(char * path){
         }
         if(*path == '/'){
             *(path_to_make + i) = '\0';
-            mkdir(path_to_make);
+            mkdir(path_to_make, 0755);
         }
         *(path_to_make + i) = *path;
         i++;
@@ -198,6 +201,9 @@ void find(char ** line, char * path, char * string){
     int is_all = 0;
     char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
     while(-1){
+        if(**line != '-'){
+            break;
+        }
         sscanf(*line, "%s", args);
         (*line) += strlen(args) + 1;
         if(strcmp(args, "-count") == 0){
@@ -225,13 +231,76 @@ void find(char ** line, char * path, char * string){
         }
     }
     char * file_data = read_file(path);
-//    int i = 0;
-//    while(-1){
-//        if(*(file_data + i) == *(string + i)){
-//
-//        }
-//        i++;
-//    }
+    int * indexes = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
+    find_complate(file_data, string, is_count, is_at, is_byword, is_all, indexes);
+}
+
+int count_counter = 0;
+int is_first = 1;
+int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes){
+    int fd_counter = 0;
+    int st_counter = 0;
+    int index_find = 0;
+    int index_word = 0;
+    while(-1){
+        printf("st_counter: %d, fd_counter: %d, index: %d, is_first: %d\n", st_counter, fd_counter, index_find, is_first);
+        puts(file_data + fd_counter + index_find);
+        puts(string + st_counter);
+        if(*(string + st_counter) == '\0'){
+            if(*(string + st_counter - 1) == '*' || *(file_data + fd_counter + index_find) == ' ' || *(file_data + fd_counter + index_find) == '\0'){
+                puts("is valid");
+                count_counter++;
+                *(indexes + count_counter - 1) = index_find;
+                if(*(file_data + index_find + fd_counter + 1) == '\0'){
+                    return 0;
+                }else{
+                    index_find = fd_counter + 2;
+                }
+            }else{
+                puts("is invalid");
+                if(is_first){
+                    index_find++;
+                    fd_counter = 0;
+                }else{
+                    return 0;
+                }
+            }
+            st_counter = 0;
+            continue;
+        }
+        if(*(file_data + fd_counter + index_find) == '\0'){
+            return 0;
+        }
+        if(*(file_data + fd_counter + index_find) != *(string + st_counter) && *(string + st_counter) != -100){
+            index_find++;
+            fd_counter = 0;
+            st_counter = 0;
+            continue;
+        }
+        if(*(file_data + fd_counter + index_find) == *(string + st_counter)){
+            st_counter++;
+            fd_counter++;
+        }
+        if(*(string + st_counter) == -100){
+            int star_counter = 1;
+            while (-1){
+                if(*(file_data + fd_counter + star_counter + index_find) == '\0'){
+                    return 0;
+                }
+                if(*(file_data + fd_counter + star_counter + index_find) == *(string + st_counter + 1)){
+                    is_first = 0;
+                    find_complate(file_data + fd_counter + star_counter + index_find, string + st_counter + 1, is_count, is_at, is_byword, is_all, indexes);
+                    is_first = 1;
+                }else{
+                    fd_counter++;
+                }
+            }
+        }
+    }
+}
+
+void return_find(){
+    return;
 }
 
 void get_pos(char ** line, int * pos_line, int * pos_start){
@@ -313,6 +382,7 @@ int file_exist(char * path){
 }
 
 int folder_exist(char * path){
+    puts(path);
     DIR* dir = opendir(path);
     if (dir) {
         closedir(dir);
@@ -396,7 +466,6 @@ char * get_string(char ** line, int effect_on_star){
 
     //char * path = line;
     int ending_type = 0;
-
     //Checking end type
     if(*(*(line) + 6) == '\"'){
         ending_type = 1;
@@ -422,9 +491,10 @@ char * get_string(char ** line, int effect_on_star){
                 *line += 2;
                 continue;
             }
+            puts(string);
         }
-        if(effect_on_star && *((*line) + i) == '*'){
-            *(string + i) = '*';
+        if(effect_on_star && **line == '*'){
+            *(string + i) = -100;
             i++;
             *(line) += 1;
             continue;
@@ -565,7 +635,7 @@ int main()
             char * string = get_string(&notAnalyzed, 1);
             char * path = get_path(&notAnalyzed);
             if(file_exist(path)){
-                find(notAnalyzed, path, string);
+                find(&notAnalyzed, path, string);
             }
         }
     }
