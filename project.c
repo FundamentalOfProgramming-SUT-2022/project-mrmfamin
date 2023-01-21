@@ -12,9 +12,14 @@
 void createfile(char * path);
 void add_string_to_file(char * path, char * string, int mode);
 void insertstr(char * path, char * string, int line, int start);
+void removestr(char * path, int line, int start, int size, int type);
+void copystr(char * path, int line, int start, int size, int type);
+void cutstr(char * path, int line, int start, int size, int type);
+void pastestr(char * path, int line, int start);
 void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
 void get_bf(char ** line, int * type);
+int step_to(char * line, char to);
 int file_exist(char * path);
 int get_index_of_pos(char * path,int line,int start);
 char * get_path(char ** line);
@@ -109,16 +114,88 @@ void removestr(char * path, int line, int start, int size, int type){
     }
 }
 
+void copystr(char * path, int line, int start, int size, int type){
+    char * file_data = read_file(path);
+    int index = get_index_of_pos(path, line, start);
+    if(type == 1){
+        file_data += index;
+        *(file_data + size) = '\0';
+        add_string_to_file("copycut.txt", file_data, 1);
+    }else if(type == 2){
+        *(file_data + index) = '\0';
+        file_data += index - size;
+
+        add_string_to_file("copycut.txt", file_data, 1);
+    }
+}
+
+void cutstr(char * path, int line, int start, int size, int type){
+    char * file_data = read_file(path);
+    int index = get_index_of_pos(path, line, start);
+    if(type == 1){
+        file_data += index;
+        *(file_data + size) = '\0';
+
+        add_string_to_file("copycut.txt", file_data, 1);
+    }else if(type == 2){
+        *(file_data + index) = '\0';
+        file_data += index - size;
+
+        add_string_to_file("copycut.txt", file_data, 1);
+    }
+    file_data = read_file(path);
+
+    if(type == 1){
+        char temp = *(file_data + index);
+        *(file_data + index) = '\0';
+
+        add_string_to_file(path, file_data, 1);
+
+        *(file_data + index) = temp;
+        file_data += index + size;
+
+        add_string_to_file(path, file_data, 2);
+    }else if(type == 2){
+        char temp = *(file_data + index - size);
+        *(file_data + index - size) = '\0';
+
+        add_string_to_file(path, file_data, 1);
+
+        *(file_data + index - size) = temp;
+        file_data += index;
+
+        add_string_to_file(path, file_data, 2);
+    }
+}
+
+void pastestr(char * path, int line, int start){
+    char * file_data = read_file(path);
+    int index = get_index_of_pos(path, line, start);
+
+    char * Ced_text = read_file("copycut.txt");
+
+    char temp = *(file_data + index);
+    *(file_data + index) = '\0';
+
+    add_string_to_file(path, file_data, 1);
+    add_string_to_file(path, Ced_text, 2);
+
+    *(file_data + index) = temp;
+    file_data += index;
+
+    add_string_to_file(path, file_data, 2);
+}
+
 void get_pos(char ** line, int * pos_line, int * pos_start){
     //Go to firs of addres
     *(line)+=6;
 
     //Analyze line and start position
-    *pos_line = string_to_int(*line, 1);
-    *line += 2;
+    *pos_line = string_to_int(*line, step_to(*line, ':'));
+    *line += step_to(*line, ':') + 1;
 
-    *pos_start = string_to_int(*line, 1);
-    *(line) += 2;
+    *pos_start = string_to_int(*line, step_to(*line, ' '));
+    *(line) += step_to(*line, ' ') + 1;
 }
 
 void get_size(char ** line, int * size){
@@ -126,15 +203,14 @@ void get_size(char ** line, int * size){
     *(line)+=6;
 
     //Analyze line and start position
-    *size = string_to_int(*line, 1);
+    *size = string_to_int(*line, step_to(*line, ' '));
 
-    *(line) += 2;
+    *(line) += step_to(*line, ' ') + 1;
 }
 
 void get_bf(char ** line, int * type){
     //Go to firs of addres
     *(line)+=1;
-
     //Analyze line and start position
     if(**line == 'f'){
         *type = 1;
@@ -143,6 +219,17 @@ void get_bf(char ** line, int * type){
     }
 
     *(line) += 2;
+}
+
+int step_to(char * line, char to){
+    int i = 0;
+    while(-1){
+        if(*(line + i) == to || *(line + i) == '\0'){
+            break;
+        }
+        i++;
+    }
+    return i;
 }
 
 int file_exist(char * path){
@@ -167,12 +254,14 @@ int get_index_of_pos(char *path,int line,int start){
         if(*(file_data + i) == 10){
             line_counter++;
             position_counter = 0;
+            i++;
+            continue;
         }
 
         position_counter++;
         i++;
     }
-    return ++i;
+    return i;
 }
 
 char * get_path(char ** line){
@@ -287,6 +376,7 @@ long long string_to_int(char * string, int lenght){
     int num;
     for(int i = lenght-1; i >= 0; i--){
         char st = *(string + (lenght - i - 1));
+        if(st == '0') num = 0;
         if(st == '1') num = 1;
         if(st == '2') num = 2;
         if(st == '3') num = 3;
@@ -348,8 +438,34 @@ int main()
             get_size(&notAnalyzed, &size);
             int type;
             get_bf(&notAnalyzed, &type);
-            printf("path: %s, line: %d, start: %d, size: %d, type: %d\n", path, pos_line, pos_start, size, type);
             removestr(path, pos_line, pos_start, size, type);
+        }else if(strcmp(command, "copystr") == 0){
+            char * path = get_path(&notAnalyzed);
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            //printf("%d %d\n", pos_line, pos_start);
+            int size;
+            get_size(&notAnalyzed, &size);
+            int type;
+            get_bf(&notAnalyzed, &type);
+            copystr(path, pos_line, pos_start, size, type);
+        }else if(strcmp(command, "cutstr") == 0){
+            char * path = get_path(&notAnalyzed);
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            int size;
+            get_size(&notAnalyzed, &size);
+            int type;
+            get_bf(&notAnalyzed, &type);
+            cutstr(path, pos_line, pos_start, size, type);
+        }else if(strcmp(command, "pastestr") == 0){
+            char * path = get_path(&notAnalyzed);
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            pastestr(path, pos_line, pos_start);
         }
     }
 
