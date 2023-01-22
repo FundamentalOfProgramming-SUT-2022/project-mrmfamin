@@ -8,6 +8,7 @@
 
 #define MAX_LINE 5000
 #define MAX_PATH_ADDRESS 500
+#define MAX_MULTIPATHS 100
 #define MAX_STRING 2000
 #define MAX_FIND_ARGS 7
 #define MAX_FIND_INDEX 100
@@ -20,8 +21,10 @@ void copystr(char * path, int line, int start, int size, int type);
 void cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
 void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
+void replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all);
 //int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
 int find_complate(char * file_data , char * string, int * indexes);
+int replace_complate(char * file_data , char * string1, int * indexes_first, int * indexes_last);
 void return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count);
 int index_to_byword(int index, char * file_data);
 void get_pos(char ** line, int * pos_line, int * pos_start);
@@ -32,7 +35,7 @@ int file_exist(char * path);
 int folder_exist(char * path);
 int get_index_of_pos(char * path,int line,int start);
 char * get_path(char ** line);
-char * get_string(char ** line, int effect_on_star);
+char * get_string(char ** line, int effect_on_star, int offset);
 char * read_file(char * path);
 long long string_to_int(char * string, int lenght);
 
@@ -202,6 +205,60 @@ void find(char ** line, char * path, char * string, int is_count, int is_byword,
     return_find(file_data, indexes, counter, is_at, is_all, is_byword, is_count);
 }
 
+void replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all){
+    char * file_data = read_file(path);
+    int * indexes_first = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
+    int * indexes_last = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
+    int counter = replace_complate(file_data, string1, indexes_first, indexes_last);
+    if(is_all){
+        if(counter == 0){
+            printf("%d\n", -1);
+        }else{
+            for(int i = 0; i < counter; i++){
+                file_data = read_file(path);
+                char tmp = *(file_data + *(indexes_first + i));
+                *(file_data + *(indexes_first + i)) = '\0';
+                add_string_to_file(path, file_data, 1);
+                add_string_to_file(path, string2, 2);
+                *(file_data + *(indexes_first + i)) = tmp;
+                file_data += *(indexes_last + i) + 1;
+                add_string_to_file(path, file_data, 2);
+                for(int j = i+1; j < counter; j++){
+                    *(indexes_first + j) -= ((*(indexes_last + i) - *(indexes_first + i)) - strlen(string2) + 1);
+                    *(indexes_last + j) -= ((*(indexes_last + i) - *(indexes_first + i)) - strlen(string2) + 1);
+                }
+            }
+        }
+    }else if(is_at){
+        if(counter < is_at){
+            printf("%d\n", -1);
+        }
+        char tmp = *(file_data + *(indexes_first + is_at));
+        *(file_data + *(indexes_first + is_at)) = '\0';
+        add_string_to_file(path, file_data, 1);
+        add_string_to_file(path, string2, 2);
+        *(file_data + *(indexes_first + is_at)) = tmp;
+        file_data += *(indexes_last + is_at) + 1;
+        add_string_to_file(path, file_data, 2);
+    }else{
+        if(counter == 0){
+            printf("%d\n", -1);
+        }else{
+            char tmp = *(file_data + *(indexes_first));
+            *(file_data + *(indexes_first)) = '\0';
+            add_string_to_file(path, file_data, 1);
+            add_string_to_file(path, string2, 2);
+            *(file_data + *(indexes_first)) = tmp;
+            file_data += *(indexes_last) + 1;
+            add_string_to_file(path, file_data, 2);
+        }
+    }
+    puts("success");
+}
+
+void grep(char ** line, char ** paths,int paths_counter,char * string,int is_c,int is_l){
+
+}
 /*
 int count_counter = 0;
 int is_first = 1;
@@ -340,6 +397,82 @@ int find_complate(char * file_data , char * string, int * indexes){
     }
 }
 
+int replace_complate(char * file_data , char * string1, int * indexes_first, int * indexes_last){
+    int fd_counter = 0;
+    int st_counter = 0;
+    int index_find = 0;
+    int counter = 0;
+    while(-1){
+        if(*(file_data + fd_counter) == '\0'){
+            counter++;
+            indexes_first[counter - 1] = index_find;
+            indexes_last[counter -1] = fd_counter - 1;
+            return counter;
+        }
+        if(*(string1 + st_counter) == '\0'){
+            if(*(file_data + fd_counter) == ' '){
+                counter++;
+                indexes_first[counter - 1] = index_find;
+                indexes_last[counter -1] = fd_counter - 1;
+                fd_counter++;
+                index_find = fd_counter;
+            }
+            st_counter = 0;
+            continue;
+        }
+        if(*(file_data + fd_counter) != *(string1 + st_counter) && *(string1 + st_counter) != -100){
+            fd_counter += step_to(file_data + fd_counter, ' ') +1;
+            st_counter = 0;
+            index_find = fd_counter;
+            if(*(file_data + fd_counter) == '\0'){
+                    return counter;
+            }
+        }else if(*(string1 + st_counter) == -100){
+            int step = step_to(string1 + st_counter, ' ') - 1;
+            int fd_step = step_to(file_data + fd_counter, ' ') - 1;
+            if(step == 0){
+                counter++;
+                indexes_first[counter - 1] = index_find;
+                fd_counter += step_to(file_data + fd_counter, ' ') + 1;
+                indexes_last[counter -1] = fd_counter - 2;
+                st_counter = 0;
+                index_find = fd_counter;
+                if(*(file_data + fd_counter) == '\0'){
+                    return counter;
+                }
+            }else{
+                int valid = 1;
+                for(int i = 0; i < step; i++){
+                    if(*(file_data + fd_counter + fd_step - i) != *(string1 + st_counter + step - i)){
+                        valid = 0;
+                        fd_counter += step_to(file_data + fd_counter, ' ')+1;
+                        st_counter = 0;
+                        index_find = fd_counter;
+                        if(*(file_data + fd_counter) == '\0'){
+                            return counter;
+                        }
+                        break;
+                    }
+                }
+                if(valid){
+                    counter++;
+                    indexes_first[counter - 1] = index_find;
+                    fd_counter += step_to(file_data + fd_counter, ' ')+1;
+                    indexes_last[counter -1] = fd_counter - 2;
+                    st_counter = 0;
+                    index_find = fd_counter;
+                    if(*(file_data + fd_counter) == '\0'){
+                        return counter;
+                    }
+                }
+            }
+        }else if (*(file_data + fd_counter) == *(string1 + st_counter)){
+            fd_counter++;
+            st_counter++;
+        }
+    }
+}
+
 void return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count){
     //printf("count: %d, byword: %d, at: %d, all: %d\n", is_count, is_byword, is_at, is_all);
     if(is_count){
@@ -356,7 +489,11 @@ void return_find(char * file_data, int * indexes, int counter, int is_at, int is
                 printf("%d\n",index_to_byword(*(indexes), file_data));
             }else{
                 if(is_at){
-                    printf("%d\n",index_to_byword(*(indexes + is_at - 1), file_data));
+                    if(counter < is_at){
+                        printf("%d\n", -1);
+                    }else{
+                        printf("%d\n",index_to_byword(*(indexes + is_at - 1), file_data));
+                    }
                 }else if(is_all){
                     for(int i = 0; i < counter; i++){
                         printf("%d", index_to_byword(*(indexes + i), file_data));
@@ -369,7 +506,7 @@ void return_find(char * file_data, int * indexes, int counter, int is_at, int is
             }
         }
     }else if(is_at){
-        if(counter == 0){
+        if(counter < is_at){
             printf("%d\n", -1);
         }else{
             printf("%d\n",*(indexes + is_at - 1));
@@ -483,8 +620,46 @@ int file_exist(char * path){
     }
 }
 
+int file_exist(char ** paths, int counter){
+    int ok = 1;
+    for(int i = 0; i < counter; i++){
+        char * path = *(paths + i);
+        FILE *check = fopen(path, "r");
+        if(check) {
+        }else{
+            ok = 0;
+            char * path_to_check = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
+            int i = 0;
+            while(*path != '\0'){
+                if(*path == '\\'){
+                    if(*(path + 1) == '\"'){
+                        *(path_to_check + i) = *(path +1);
+                        i++;
+                        path += 2;
+                        continue;
+                    }
+                }
+                if(*path == '/'){
+                    *(path_to_check + i) = '\0';
+                    if(!folder_exist(path_to_check)){
+                        puts("Some addres is Invalid");
+                        return 0;
+                    }
+                }
+                *(path_to_check + i) = *path;
+                i++;
+                path += 1;
+            }
+        }
+    }
+    if(ok){
+        return 1;
+    }else{
+        puts("Some file isn't exist");
+    }
+}
+
 int folder_exist(char * path){
-    puts(path);
     DIR* dir = opendir(path);
     if (dir) {
         closedir(dir);
@@ -562,20 +737,74 @@ char * get_path(char ** line){
     return path;
 }
 
-char * get_string(char ** line, int effect_on_star){
+int get_multipath(char ** line, char ** paths){
+    //end types
+    const char end_str_with[] = {' ', '\"'};
+
+    //char * path = line;
+    
+    //Go to firs of addres
+    *(line)+=8;
+    int counter = 0;
+    while(-1){
+        int ending_type = 0;
+        if(**line  != '/' && **line != '\"'){
+            return counter;
+        }
+
+        //Checking end type
+        if(*(*(line)) == '\"'){
+            ending_type = 1;
+            *(line) += 1;
+        }
+
+        *(line) += 1;
+
+        //Analyze path and create folders
+        char * path = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
+        int i = 0;
+        while(**line != end_str_with[ending_type] && **line != '\0'){
+            if(**line == '\\'){
+                if(*((*line)+1) == '\\' || *((*line)+1) == '\"'){
+                    *(path + i) = *((*line)+1);
+                    i++;
+                    *line += 2;
+                    continue;
+                }else if(*((*line)+1) == 'n'){
+                    *(path + i) = 10;
+                    i++;
+                    *line += 2;
+                    continue;
+                }
+            }
+            *(path + i) = **line;
+            i++;
+            *(line) += 1;
+        }
+        *(path + i) = '\0';
+        
+        *(paths + counter) = path;
+
+        *(line) += ending_type;
+        *(line) += 1;
+        counter++;
+    }
+}
+
+char * get_string(char ** line, int effect_on_star, int offset){
     //end types
     const char end_str_with[] = {' ', '\"'};
 
     //char * path = line;
     int ending_type = 0;
     //Checking end type
-    if(*(*(line) + 6) == '\"'){
+    if(*(*(line) + 6 + offset) == '\"'){
         ending_type = 1;
         *(line) += 1;
     }
 
     //Go to firs of addres
-    *(line)+=6;
+    *(line)+= 6 + offset;
 
     //Analyze path and create folders
     char * string = (char *)malloc((MAX_STRING + 1) * sizeof(char));
@@ -676,7 +905,7 @@ int main()
         }else if(strcmp(command, "insertstr") == 0){
             char * path = get_path(&notAnalyzed);
             if(file_exist(path)){
-                char * string = get_string(&notAnalyzed, 0);
+                char * string = get_string(&notAnalyzed, 0, 0);
                 int pos_line;
                 int pos_start;
                 get_pos(&notAnalyzed, &pos_line, &pos_start);
@@ -748,7 +977,7 @@ int main()
                 }
                 sscanf(notAnalyzed, "%s", args);
                 if(strcmp(args, "--str") == 0){
-                    string = get_string(&notAnalyzed, 1);
+                    string = get_string(&notAnalyzed, 1, 0);
                 }else if(strcmp(args, "--file") == 0){
                     path = get_path(&notAnalyzed);
                 }else{
@@ -776,7 +1005,7 @@ int main()
             if(file_exist(path)){
                 find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
             }
-        }else if(strcmp(command, "replace")){
+        }else if(strcmp(command, "replace") == 0){
             char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
             int is_at = 0;
             int is_all = 0;
@@ -790,31 +1019,62 @@ int main()
                 }
                 sscanf(notAnalyzed, "%s", args);
                 if(strcmp(args, "--str1") == 0){
-                    string1 = get_string(&notAnalyzed, 1);
+                    string1 = get_string(&notAnalyzed, 1, 1);
                 }else if(strcmp(args, "--str2") == 0){
-                    string2 = get_string(&notAnalyzed, 1);
+                    string2 = get_string(&notAnalyzed, 1, 1);
                 }else if(strcmp(args, "--file") == 0){
                     path = get_path(&notAnalyzed);
-                }else{
-                    while(-1){
-                        if(*notAnalyzed != '-'){
-                            break;
-                        }
-                        notAnalyzed += strlen(args) + 1;
-                        if(strcmp(args, "-at") == 0){
-                            is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
-                            notAnalyzed += step_to(notAnalyzed, ' ') + 1;
-                        }else if(strcmp(args, "-all") == 0){
-                            is_all = 1;
-                        }
-                        if(*(notAnalyzed - 1) != ' '){
-                            break;
-                        }
+                }else if(strcmp(args, "-at") == 0){
+                    if(is_all){
+                        puts("Invalid arg. can't set -at with -all");
                     }
+                    notAnalyzed += strlen(args) + 1;
+                    is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
+                    notAnalyzed += step_to(notAnalyzed, ' ') + 1;
+                }else if(strcmp(args, "-all") == 0){
+                    if(is_at){
+                        puts("Invalid arg. can't set -at with -all");
+                    }
+                    notAnalyzed += strlen(args) + 1;
+                    is_all = 1;
                 }
             }
             if(file_exist(path)){
                 replace(&notAnalyzed, path, string1, string2, is_at, is_all);
+            }
+        }else if(strcmp(command, "gref") == 0){
+            char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+            int is_c = 0;
+            int is_l = 0;
+            char * string;
+            char * paths[MAX_MULTIPATHS];
+            int paths_counter = 0;
+            while (-1)
+            {
+                if(*notAnalyzed != '-'){
+                    break;
+                }
+                sscanf(notAnalyzed, "%s", args);
+                if(strcmp(args, "--str") == 0){
+                    string = get_string(&notAnalyzed, 1, 1);
+                }else if(strcmp(args, "--file") == 0){
+                    paths_counter = get_multipath(&notAnalyzed , paths);
+                }else if(strcmp(args, "-l") == 0){
+                    if(is_c){
+                        puts("Invalid arg. can't set -c with -l");
+                    }
+                    notAnalyzed += strlen(args) + 1;
+                    is_l = 1;
+                }else if(strcmp(args, "-c") == 0){
+                    if(is_l){
+                        puts("Invalid arg. can't set -c with -l");
+                    }
+                    notAnalyzed += strlen(args) + 1;
+                    is_c = 1;
+                }
+            }
+            if(multifile_exist(paths, paths_counter)){
+                grep(&notAnalyzed, paths, paths_counter, string, is_c, is_l);
             }
         }
     }
