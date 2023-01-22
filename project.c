@@ -12,7 +12,6 @@
 #define MAX_FIND_ARGS 7
 #define MAX_FIND_INDEX 100
 
-
 void createfile(char * path);
 void add_string_to_file(char * path, char * string, int mode);
 void insertstr(char * path, char * string, int line, int start);
@@ -21,7 +20,7 @@ void copystr(char * path, int line, int start, int size, int type);
 void cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
 void find(char ** line, char * path, char * string);
-int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
+//int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
 void return_find();
 void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
@@ -49,7 +48,7 @@ void createfile(char * path){
         }
         if(*path == '/'){
             *(path_to_make + i) = '\0';
-            mkdir(path_to_make, 0755);
+            mkdir(path_to_make);
         }
         *(path_to_make + i) = *path;
         i++;
@@ -232,16 +231,17 @@ void find(char ** line, char * path, char * string){
     }
     char * file_data = read_file(path);
     int * indexes = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
-    find_complate(file_data, string, is_count, is_at, is_byword, is_all, indexes);
+    find_complate(file_data, string);
 }
-
+/*
 int count_counter = 0;
 int is_first = 1;
-int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes){
+int find_complate2(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes){
     int fd_counter = 0;
     int st_counter = 0;
     int index_find = 0;
     int index_word = 0;
+
     while(-1){
         printf("st_counter: %d, fd_counter: %d, index: %d, is_first: %d\n", st_counter, fd_counter, index_find, is_first);
         puts(file_data + fd_counter + index_find);
@@ -296,6 +296,43 @@ int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int
                 }
             }
         }
+    }
+}*/
+
+void find_complate(char * file_data , char * string){
+    int fd_counter = 0;
+    int st_counter = 0;
+    int index_find = 0;
+    int counter = 0;
+    while(-1){
+        if(*(file_data + fd_counter) == '\0'){
+            counter++;
+            return;
+        }
+        if(*(file_data + fd_counter) != *(string + st_counter) && *(string + st_counter) != -100){
+            fd_counter += step_to(file_data + fd_counter, ' ');
+            st_counter = 0;
+        }else if(*(string + st_counter) == -100){
+            int step = step_to(string + st_counter, ' ') - 1;
+            int fd_step = step_to(file_data + fd_counter, ' ') - 1;
+            if(step == 1){
+                counter++;
+                fd_counter += step_to(file_data + fd_counter, ' ');
+                st_counter = 0;
+            }else{
+                for(int i = 0; i < step; i++){
+                    if(*(file_data + fd_counter + fd_step - i) != *(string + st_counter + step - i)){
+                        fd_counter += step_to(file_data + fd_counter, ' ');
+                        st_counter = 0;
+                        break;
+                    }
+                }
+            }
+        }else{
+            fd_counter++;
+            st_counter++;
+        }
+        
     }
 }
 
