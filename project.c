@@ -19,9 +19,11 @@ void removestr(char * path, int line, int start, int size, int type);
 void copystr(char * path, int line, int start, int size, int type);
 void cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
-void find(char ** line, char * path, char * string);
+void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
 //int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
-void return_find();
+int find_complate(char * file_data , char * string, int * indexes);
+void return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count);
+int index_to_byword(int index, char * file_data);
 void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
 void get_bf(char ** line, int * type);
@@ -193,46 +195,13 @@ void pastestr(char * path, int line, int start){
     add_string_to_file(path, file_data, 2);
 }
 
-void find(char ** line, char * path, char * string){
-    int is_count = 0;
-    int is_at = 0;
-    int is_byword = 0;
-    int is_all = 0;
-    char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
-    while(-1){
-        if(**line != '-'){
-            break;
-        }
-        sscanf(*line, "%s", args);
-        (*line) += strlen(args) + 1;
-        if(strcmp(args, "-count") == 0){
-            is_count = 1;
-            break;
-        }else if(strcmp(args, "-at") == 0){
-            is_at = string_to_int(*line, step_to(*line, ' '));
-            *line += step_to(*line, ' ') + 1;
-            if(is_byword){
-                break;
-            }
-        }else if(strcmp(args, "-byword") == 0){
-            is_byword = 1;
-            if(is_all || is_at){
-                break;
-            }
-        }else if(strcmp(args, "-all") == 0){
-            is_all = 1;
-            if(is_byword){
-                break;
-            }
-        }
-        if(*((*line) - 1) != ' '){
-            break;
-        }
-    }
+void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all){
     char * file_data = read_file(path);
     int * indexes = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
-    find_complate(file_data, string);
+    int counter = find_complate(file_data, string, indexes);
+    return_find(file_data, indexes, counter, is_at, is_all, is_byword, is_count);
 }
+
 /*
 int count_counter = 0;
 int is_first = 1;
@@ -299,7 +268,7 @@ int find_complate2(char * file_data , char * string ,int is_count ,int is_at ,in
     }
 }*/
 
-void find_complate(char * file_data , char * string){
+int find_complate(char * file_data , char * string, int * indexes){
     int fd_counter = 0;
     int st_counter = 0;
     int index_find = 0;
@@ -307,37 +276,133 @@ void find_complate(char * file_data , char * string){
     while(-1){
         if(*(file_data + fd_counter) == '\0'){
             counter++;
-            return;
+            indexes[counter - 1] = index_find;
+            return counter;
+        }
+        if(*(string + st_counter) == '\0'){
+            if(*(file_data + fd_counter) == ' '){
+                counter++;
+                indexes[counter - 1] = index_find;
+                fd_counter++;
+                index_find = fd_counter;
+            }
+            st_counter = 0;
+            continue;
         }
         if(*(file_data + fd_counter) != *(string + st_counter) && *(string + st_counter) != -100){
-            fd_counter += step_to(file_data + fd_counter, ' ');
+            fd_counter += step_to(file_data + fd_counter, ' ') +1;
             st_counter = 0;
+            index_find = fd_counter;
+            if(*(file_data + fd_counter) == '\0'){
+                    return counter;
+            }
         }else if(*(string + st_counter) == -100){
             int step = step_to(string + st_counter, ' ') - 1;
             int fd_step = step_to(file_data + fd_counter, ' ') - 1;
-            if(step == 1){
+            if(step == 0){
                 counter++;
-                fd_counter += step_to(file_data + fd_counter, ' ');
+                indexes[counter - 1] = index_find;
+                fd_counter += step_to(file_data + fd_counter, ' ') + 1;
                 st_counter = 0;
+                index_find = fd_counter;
+                if(*(file_data + fd_counter) == '\0'){
+                    return counter;
+                }
             }else{
+                int valid = 1;
                 for(int i = 0; i < step; i++){
                     if(*(file_data + fd_counter + fd_step - i) != *(string + st_counter + step - i)){
-                        fd_counter += step_to(file_data + fd_counter, ' ');
+                        valid = 0;
+                        fd_counter += step_to(file_data + fd_counter, ' ')+1;
                         st_counter = 0;
+                        index_find = fd_counter;
+                        if(*(file_data + fd_counter) == '\0'){
+                            return counter;
+                        }
                         break;
                     }
                 }
+                if(valid){
+                    counter++;
+                    indexes[counter - 1] = index_find;
+                    fd_counter += step_to(file_data + fd_counter, ' ')+1;
+                    st_counter = 0;
+                    index_find = fd_counter;
+                    if(*(file_data + fd_counter) == '\0'){
+                        return counter;
+                    }
+                }
             }
-        }else{
+        }else if (*(file_data + fd_counter) == *(string + st_counter)){
             fd_counter++;
             st_counter++;
         }
-        
     }
 }
 
-void return_find(){
-    return;
+void return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count){
+    //printf("count: %d, byword: %d, at: %d, all: %d\n", is_count, is_byword, is_at, is_all);
+    if(is_count){
+        if(is_all || is_at || is_byword){
+            puts("Invalid args");
+            return;
+        }
+        printf("%d\n", counter);
+    }else if(is_byword){
+        if(counter == 0){
+            printf("%d\n", -1);
+        }else{
+            if(!is_at && !is_all){
+                printf("%d\n",index_to_byword(*(indexes), file_data));
+            }else{
+                if(is_at){
+                    printf("%d\n",index_to_byword(*(indexes + is_at - 1), file_data));
+                }else if(is_all){
+                    for(int i = 0; i < counter; i++){
+                        printf("%d", index_to_byword(*(indexes + i), file_data));
+                        if(i != counter-1){
+                            printf(",");
+                        }
+                    }
+                    printf("\n");
+                }
+            }
+        }
+    }else if(is_at){
+        if(counter == 0){
+            printf("%d\n", -1);
+        }else{
+            printf("%d\n",*(indexes + is_at - 1));
+        }
+    }else if(is_all){
+        if(counter == 0){
+            printf("%d\n", -1);
+        }else{
+            for(int i = 0; i < counter; i++){
+                printf("%d", *(indexes + i));
+                if(i != counter-1){
+                    printf(",");
+                }
+            }
+            printf("\n");
+        }
+    }else{
+        if(counter == 0){
+            printf("%d\n", -1);
+        }else{
+            printf("%d\n",*(indexes));
+        }
+    }
+}
+
+int index_to_byword(int index, char * file_data){
+    int byword = 1;
+    for(int i = 0; i <= index; i++){
+        if(*(file_data + i) == ' '){
+            byword++;
+        }
+    }
+    return byword;
 }
 
 void get_pos(char ** line, int * pos_line, int * pos_start){
@@ -669,10 +734,87 @@ int main()
                 pastestr(path, pos_line, pos_start);
             }
         }else if(strcmp(command, "find") == 0){
-            char * string = get_string(&notAnalyzed, 1);
-            char * path = get_path(&notAnalyzed);
+            char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+            int is_count = 0;
+            int is_at = 0;
+            int is_byword = 0;
+            int is_all = 0;
+            char * string;
+            char * path;
+            while (-1)
+            {
+                if(*notAnalyzed != '-'){
+                    break;
+                }
+                sscanf(notAnalyzed, "%s", args);
+                if(strcmp(args, "--str") == 0){
+                    string = get_string(&notAnalyzed, 1);
+                }else if(strcmp(args, "--file") == 0){
+                    path = get_path(&notAnalyzed);
+                }else{
+                    while(-1){
+                        if(*notAnalyzed != '-'){
+                            break;
+                        }
+                        notAnalyzed += strlen(args) + 1;
+                        if(strcmp(args, "-count") == 0){
+                            is_count = 1;
+                        }else if(strcmp(args, "-at") == 0){
+                            is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
+                            notAnalyzed += step_to(notAnalyzed, ' ') + 1;
+                        }else if(strcmp(args, "-byword") == 0){
+                            is_byword = 1;
+                        }else if(strcmp(args, "-all") == 0){
+                            is_all = 1;
+                        }
+                        if(*(notAnalyzed - 1) != ' '){
+                            break;
+                        }
+                    }
+                }
+            }
             if(file_exist(path)){
-                find(&notAnalyzed, path, string);
+                find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
+            }
+        }else if(strcmp(command, "replace")){
+            char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+            int is_at = 0;
+            int is_all = 0;
+            char * string1;
+            char * string2;
+            char * path;
+            while (-1)
+            {
+                if(*notAnalyzed != '-'){
+                    break;
+                }
+                sscanf(notAnalyzed, "%s", args);
+                if(strcmp(args, "--str1") == 0){
+                    string1 = get_string(&notAnalyzed, 1);
+                }else if(strcmp(args, "--str2") == 0){
+                    string2 = get_string(&notAnalyzed, 1);
+                }else if(strcmp(args, "--file") == 0){
+                    path = get_path(&notAnalyzed);
+                }else{
+                    while(-1){
+                        if(*notAnalyzed != '-'){
+                            break;
+                        }
+                        notAnalyzed += strlen(args) + 1;
+                        if(strcmp(args, "-at") == 0){
+                            is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
+                            notAnalyzed += step_to(notAnalyzed, ' ') + 1;
+                        }else if(strcmp(args, "-all") == 0){
+                            is_all = 1;
+                        }
+                        if(*(notAnalyzed - 1) != ' '){
+                            break;
+                        }
+                    }
+                }
+            }
+            if(file_exist(path)){
+                replace(&notAnalyzed, path, string1, string2, is_at, is_all);
             }
         }
     }
