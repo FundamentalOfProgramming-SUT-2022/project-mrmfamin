@@ -10,7 +10,7 @@
 #define MAX_PATH_ADDRESS 500
 #define MAX_MULTIPATHS 100
 #define MAX_STRING 2000
-#define MAX_FIND_ARGS 7
+#define MAX_FIND_ARGS 8
 #define MAX_FIND_INDEX 100
 
 void createfile(char * path);
@@ -22,6 +22,8 @@ void cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
 void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
 void replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all);
+void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l);
+void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l);
 //int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
 int find_complate(char * file_data , char * string, int * indexes);
 int replace_complate(char * file_data , char * string1, int * indexes_first, int * indexes_last);
@@ -256,9 +258,97 @@ void replace(char ** line, char * path, char * string1, char * string2, int is_a
     puts("success");
 }
 
-void grep(char ** line, char ** paths,int paths_counter,char * string,int is_c,int is_l){
-
+void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l){
+    int * indexes;
+    char * file_data;
+    int fd_counter;
+    int st_counter;
+    int index_find;
+    int counter = 0;
+    for (int i = 0; i < paths_counter; i++)
+    {
+        file_data = read_file(*(paths + i));
+        indexes = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
+        fd_counter = 0;
+        st_counter = 0;
+        index_find = 0;
+        if(!is_c){
+            counter = 0;
+        }
+        while(-1){
+            if(*(file_data + fd_counter) == '\0' && fd_counter != 0 && *(string + st_counter) == '\0'){
+                counter++;
+                indexes[counter - 1] = index_find;
+                break;
+            }
+            if(*(string + st_counter) == '\0'){
+                counter++;
+                indexes[counter - 1] = index_find;
+                fd_counter += step_to(file_data + fd_counter, 10) +1;
+                index_find = fd_counter;
+                st_counter = 0;
+                continue;
+            }
+            if(*(file_data + fd_counter) != *(string + st_counter)){
+                fd_counter++;
+                st_counter = 0;
+                if(*(file_data + fd_counter) == '\0'){
+                    break;
+                }
+            }else if (*(file_data + fd_counter) == *(string + st_counter)){
+                fd_counter++;
+                st_counter++;
+            }
+        }
+        if(!is_c){
+            return_grep(indexes, counter, *(paths + i), file_data, is_c, is_l);
+        }
+    }
+    if(is_c){
+        return_grep(indexes, counter, *(paths), file_data, is_c, is_l);
+    }
 }
+
+void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l){
+    if(is_l){
+        if(counter > 0){
+            int j = 0;
+            while(-1){
+                if(*(path_name + j) == '\0'){
+                    break;
+                }
+                printf("%c", *(path_name + j));
+                j++;
+            }
+            printf("\n");
+        }
+    }else if(is_c){
+        printf("%d\n", counter);
+    }else{
+        for(int i = 0; i < counter; i++){
+            int j = 0;
+            while(-1){
+                if(*(path_name + j) == '\0'){
+                    break;
+                }
+                printf("%c", *(path_name + j));
+                j++;
+            }
+            printf(": ");
+            j = 0;
+            while (-1)
+            {
+                if(*(file_read + j + *(indexes + i)) == '\n' || *(file_read + j) == '\0'){
+                    break;
+                }
+                printf("%c", *(file_read + j + *(indexes + i)));
+                j++;
+            }
+            printf("\n");
+        }
+    }
+}
+
 /*
 int count_counter = 0;
 int is_first = 1;
@@ -331,7 +421,7 @@ int find_complate(char * file_data , char * string, int * indexes){
     int index_find = 0;
     int counter = 0;
     while(-1){
-        if(*(file_data + fd_counter) == '\0'){
+        if(*(file_data + fd_counter) == '\0' && fd_counter != 0 && *(string + st_counter) == '\0'){
             counter++;
             indexes[counter - 1] = index_find;
             return counter;
@@ -403,7 +493,7 @@ int replace_complate(char * file_data , char * string1, int * indexes_first, int
     int index_find = 0;
     int counter = 0;
     while(-1){
-        if(*(file_data + fd_counter) == '\0'){
+        if(*(file_data + fd_counter) == '\0' && fd_counter != 0 && *(string1 + st_counter) == '\0'){
             counter++;
             indexes_first[counter - 1] = index_find;
             indexes_last[counter -1] = fd_counter - 1;
@@ -620,7 +710,7 @@ int file_exist(char * path){
     }
 }
 
-int file_exist(char ** paths, int counter){
+int multifile_exist(char ** paths, int counter){
     int ok = 1;
     for(int i = 0; i < counter; i++){
         char * path = *(paths + i);
@@ -1042,7 +1132,7 @@ int main()
             if(file_exist(path)){
                 replace(&notAnalyzed, path, string1, string2, is_at, is_all);
             }
-        }else if(strcmp(command, "gref") == 0){
+        }else if(strcmp(command, "grep") == 0){
             char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
             int is_c = 0;
             int is_l = 0;
@@ -1056,18 +1146,20 @@ int main()
                 }
                 sscanf(notAnalyzed, "%s", args);
                 if(strcmp(args, "--str") == 0){
-                    string = get_string(&notAnalyzed, 1, 1);
-                }else if(strcmp(args, "--file") == 0){
+                    string = get_string(&notAnalyzed, 1, 0);
+                }else if(strcmp(args, "--files") == 0){
                     paths_counter = get_multipath(&notAnalyzed , paths);
                 }else if(strcmp(args, "-l") == 0){
                     if(is_c){
                         puts("Invalid arg. can't set -c with -l");
+                        continue;
                     }
                     notAnalyzed += strlen(args) + 1;
                     is_l = 1;
                 }else if(strcmp(args, "-c") == 0){
                     if(is_l){
                         puts("Invalid arg. can't set -c with -l");
+                        continue;
                     }
                     notAnalyzed += strlen(args) + 1;
                     is_c = 1;
