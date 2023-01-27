@@ -23,6 +23,7 @@ void pastestr(char * path, int line, int start);
 void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
 void replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all);
 void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l);
+void undo(char * path);
 void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l);
 //int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
 int find_complate(char * file_data , char * string, int * indexes);
@@ -307,6 +308,10 @@ void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,
     if(is_c){
         return_grep(indexes, counter, *(paths), file_data, is_c, is_l);
     }
+}
+
+void undo(char * path){
+    puts("undo");
 }
 
 void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l){
@@ -1167,6 +1172,11 @@ int main()
             }
             if(multifile_exist(paths, paths_counter)){
                 grep(&notAnalyzed, paths, paths_counter, string, is_c, is_l);
+            }
+        }else if(strcmp(command, "undo") == 0){
+            char * path = get_path(&notAnalyzed);
+            if(file_exist(path)) {
+                undo(path);
             }
         }
     }
