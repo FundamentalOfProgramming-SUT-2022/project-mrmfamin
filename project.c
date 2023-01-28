@@ -6,16 +6,19 @@
 #include <sys/types.h>
 #include <math.h>
 
-#define MAX_LINE 5000
-#define MAX_PATH_ADDRESS 500
-#define MAX_MULTIPATHS 100
-#define MAX_STRING 2000
+#define MAX_LINE 20000
+#define MAX_PATH_ADDRESS 5000
+#define MAX_MULTIPATHS 15000
+#define MAX_STRING 10000
 #define MAX_FIND_ARGS 8
-#define MAX_FIND_INDEX 100
+#define MAX_FIND_INDEX 500
+#define MAX_UNDO_COMMAND 2000
 
+
+void run(char * line);
 void createfile(char * path);
-void add_string_to_file(char * path, char * string, int mode);
-void insertstr(char * path, char * string, int line, int start);
+void add_string_to_file(char * path, char * string, int mode, int fol);
+int insertstr(char * path, char * string, int line, int start);
 void removestr(char * path, int line, int start, int size, int type);
 void copystr(char * path, int line, int start, int size, int type);
 void cutstr(char * path, int line, int start, int size, int type);
@@ -74,32 +77,53 @@ void createfile(char * path){
     fclose(file_to_make);
 }
 
-void add_string_to_file(char * path, char * string, int mode){
+void add_string_to_file(char * path, char * string, int mode, int fol){
     if(mode == 1){
         FILE *file = fopen(path, "w");
         fwrite(string, sizeof(char), strlen(string), file);
         fclose(file);
     }else if(mode == 2){
         FILE *file = fopen(path, "a");
+        if(fol){
+            rewind(file);
+        }
         fwrite(string, sizeof(char), strlen(string), file);
         fclose(file);
     }
 }
 
-void insertstr(char * path, char * string, int line, int start){
+void add_int_to_file(char * path, int string, int mode){
+    /*char * read = (char *)malloc(sizeof(int) * 1);
+    fprintf()*/
+    FILE *file;
+    if(mode == 1){
+        file = fopen(path, "w");
+        fprintf(file, "%d", string);
+        //fwrite(&string, sizeof(int), 1, file);
+    }else if(mode == 2){
+        file = fopen(path, "a");
+        fprintf(file, "%d", string);
+        //fwrite(&string, sizeof(int), 1, file);
+    }
+    fclose(file);
+}
+
+int insertstr(char * path, char * string, int line, int start){
     char * file_data = read_file(path);
     int index = get_index_of_pos(path, line, start);
 
     char temp = *(file_data + index);
     *(file_data + index) = '\0';
 
-    add_string_to_file(path, file_data, 1);
-    add_string_to_file(path, string, 2);
+    add_string_to_file(path, file_data, 1, 0);
+    add_string_to_file(path, string, 2, 0);
 
     *(file_data + index) = temp;
     file_data += index;
 
-    add_string_to_file(path, file_data, 2);
+    add_string_to_file(path, file_data, 2, 0);
+
+    return strlen(string);
 }
 
 void removestr(char * path, int line, int start, int size, int type){
@@ -110,22 +134,22 @@ void removestr(char * path, int line, int start, int size, int type){
         char temp = *(file_data + index);
         *(file_data + index) = '\0';
 
-        add_string_to_file(path, file_data, 1);
+        add_string_to_file(path, file_data, 1, 0);
 
         *(file_data + index) = temp;
         file_data += index + size;
 
-        add_string_to_file(path, file_data, 2);
+        add_string_to_file(path, file_data, 2, 0);
     }else if(type == 2){
         char temp = *(file_data + index - size);
         *(file_data + index - size) = '\0';
 
-        add_string_to_file(path, file_data, 1);
+        add_string_to_file(path, file_data, 1, 0);
 
         *(file_data + index - size) = temp;
         file_data += index;
 
-        add_string_to_file(path, file_data, 2);
+        add_string_to_file(path, file_data, 2, 0);
     }
 }
 
@@ -135,12 +159,12 @@ void copystr(char * path, int line, int start, int size, int type){
     if(type == 1){
         file_data += index;
         *(file_data + size) = '\0';
-        add_string_to_file("copycut.txt", file_data, 1);
+        add_string_to_file("copycut.txt", file_data, 1, 0);
     }else if(type == 2){
         *(file_data + index) = '\0';
         file_data += index - size;
 
-        add_string_to_file("copycut.txt", file_data, 1);
+        add_string_to_file("copycut.txt", file_data, 1, 0);
     }
 }
 
@@ -151,12 +175,12 @@ void cutstr(char * path, int line, int start, int size, int type){
         file_data += index;
         *(file_data + size) = '\0';
 
-        add_string_to_file("copycut.txt", file_data, 1);
+        add_string_to_file("copycut.txt", file_data, 1, 0);
     }else if(type == 2){
         *(file_data + index) = '\0';
         file_data += index - size;
 
-        add_string_to_file("copycut.txt", file_data, 1);
+        add_string_to_file("copycut.txt", file_data, 1, 0);
     }
     file_data = read_file(path);
 
@@ -164,22 +188,22 @@ void cutstr(char * path, int line, int start, int size, int type){
         char temp = *(file_data + index);
         *(file_data + index) = '\0';
 
-        add_string_to_file(path, file_data, 1);
+        add_string_to_file(path, file_data, 1, 0);
 
         *(file_data + index) = temp;
         file_data += index + size;
 
-        add_string_to_file(path, file_data, 2);
+        add_string_to_file(path, file_data, 2, 0);
     }else if(type == 2){
         char temp = *(file_data + index - size);
         *(file_data + index - size) = '\0';
 
-        add_string_to_file(path, file_data, 1);
+        add_string_to_file(path, file_data, 1, 0);
 
         *(file_data + index - size) = temp;
         file_data += index;
 
-        add_string_to_file(path, file_data, 2);
+        add_string_to_file(path, file_data, 2, 0);
     }
 }
 
@@ -192,13 +216,13 @@ void pastestr(char * path, int line, int start){
     char temp = *(file_data + index);
     *(file_data + index) = '\0';
 
-    add_string_to_file(path, file_data, 1);
-    add_string_to_file(path, Ced_text, 2);
+    add_string_to_file(path, file_data, 1, 0);
+    add_string_to_file(path, Ced_text, 2, 0);
 
     *(file_data + index) = temp;
     file_data += index;
 
-    add_string_to_file(path, file_data, 2);
+    add_string_to_file(path, file_data, 2, 0);
 }
 
 void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all){
@@ -221,11 +245,11 @@ void replace(char ** line, char * path, char * string1, char * string2, int is_a
                 file_data = read_file(path);
                 char tmp = *(file_data + *(indexes_first + i));
                 *(file_data + *(indexes_first + i)) = '\0';
-                add_string_to_file(path, file_data, 1);
-                add_string_to_file(path, string2, 2);
+                add_string_to_file(path, file_data, 1, 0);
+                add_string_to_file(path, string2, 2, 0);
                 *(file_data + *(indexes_first + i)) = tmp;
                 file_data += *(indexes_last + i) + 1;
-                add_string_to_file(path, file_data, 2);
+                add_string_to_file(path, file_data, 2, 0);
                 for(int j = i+1; j < counter; j++){
                     *(indexes_first + j) -= ((*(indexes_last + i) - *(indexes_first + i)) - strlen(string2) + 1);
                     *(indexes_last + j) -= ((*(indexes_last + i) - *(indexes_first + i)) - strlen(string2) + 1);
@@ -238,22 +262,22 @@ void replace(char ** line, char * path, char * string1, char * string2, int is_a
         }
         char tmp = *(file_data + *(indexes_first + is_at));
         *(file_data + *(indexes_first + is_at)) = '\0';
-        add_string_to_file(path, file_data, 1);
-        add_string_to_file(path, string2, 2);
+        add_string_to_file(path, file_data, 1, 0);
+        add_string_to_file(path, string2, 2, 0);
         *(file_data + *(indexes_first + is_at)) = tmp;
         file_data += *(indexes_last + is_at) + 1;
-        add_string_to_file(path, file_data, 2);
+        add_string_to_file(path, file_data, 2, 0);
     }else{
         if(counter == 0){
             printf("%d\n", -1);
         }else{
             char tmp = *(file_data + *(indexes_first));
             *(file_data + *(indexes_first)) = '\0';
-            add_string_to_file(path, file_data, 1);
-            add_string_to_file(path, string2, 2);
+            add_string_to_file(path, file_data, 1, 0);
+            add_string_to_file(path, string2, 2, 0);
             *(file_data + *(indexes_first)) = tmp;
             file_data += *(indexes_last) + 1;
-            add_string_to_file(path, file_data, 2);
+            add_string_to_file(path, file_data, 2, 0);
         }
     }
     puts("success");
@@ -311,7 +335,24 @@ void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,
 }
 
 void undo(char * path){
-    puts("undo");
+    char * history = read_file("history.txt");
+    char * history_path = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
+    while(-1){
+        history_path = get_path(&history);
+        if(strcmp(path, history_path) == 0){
+            //history += strlen(history_path) + 1;
+            //make_undo(history, i);
+            int step = step_to(history, 10);
+            *(history + step) = '\0';
+            run(history);
+            *(history + step) = 10;
+            history += step + 1;
+            add_string_to_file("history.txt", history, 1, 0);
+            break;
+        }else{
+            history += step_to(history , 10) + 1;
+        }
+    }
 }
 
 void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l){
@@ -975,211 +1016,246 @@ long long string_to_int(char * string, int lenght){
     return in;
 }
 
+void add_history(int type, char * path, int lenght, int pos_start, int pos_line){
+    char * newline;
+    *newline = (char)10;
+    *(newline + 1) = '\0';
+    char * read = (char *) malloc((MAX_UNDO_COMMAND + 1) * sizeof(char));
+    char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+    switch (type)
+    {
+    case 1:
+        strcpy(read, "--file \"/");
+        strcat(read, path);
+        strcat(read, "\" removestr --file \"/");
+        strcat(read, path);
+        strcat(read, "\" --pos ");
+        sprintf(intToStr, "%d", pos_line);
+        strcat(read, intToStr);
+        strcat(read, ":");
+        sprintf(intToStr, "%d", pos_start);
+        strcat(read, intToStr);
+        strcat(read, " -size ");
+        sprintf(intToStr, "%d", lenght);
+        strcat(read, intToStr);
+        strcat(read, " -f");
+        strcat(read, newline);
+        add_string_to_file("history.txt", read, 2, 1);
+        break;
+    
+    case 2:
+
+        break;
+    }
+}
+
+void run(char * line){
+    char * command = (char *)malloc((MAX_LINE + 1) * sizeof(char));
+    char * notAnalyzed = line;
+
+    //explode line to command
+    sscanf(notAnalyzed, "%s", command);
+    notAnalyzed += strlen(command) + 1;
+
+    //command switch
+    if(strcmp(command, "createfile") == 0){
+        char * path = get_path(&notAnalyzed);
+        createfile(path);
+    }else if(strcmp(command, "insertstr") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)){
+            char * string = get_string(&notAnalyzed, 0, 0);
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            int lenght = insertstr(path, string, pos_line, pos_start);
+            add_history(1, path, lenght, pos_start, pos_line);
+        }
+    }else if(strcmp(command, "cat") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)){
+            puts(read_file(path));
+        }
+    }else if(strcmp(command, "removestr") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)) {
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            int size;
+            get_size(&notAnalyzed, &size);
+            int type;
+            get_bf(&notAnalyzed, &type);
+            removestr(path, pos_line, pos_start, size, type);
+        }
+    }else if(strcmp(command, "copystr") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)){
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            //printf("%d %d\n", pos_line, pos_start);
+            int size;
+            get_size(&notAnalyzed, &size);
+            int type;
+            get_bf(&notAnalyzed, &type);
+            copystr(path, pos_line, pos_start, size, type);
+        }
+    }else if(strcmp(command, "cutstr") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)) {
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            int size;
+            get_size(&notAnalyzed, &size);
+            int type;
+            get_bf(&notAnalyzed, &type);
+            cutstr(path, pos_line, pos_start, size, type);
+        }
+    }else if(strcmp(command, "pastestr") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)){
+            int pos_line;
+            int pos_start;
+            get_pos(&notAnalyzed, &pos_line, &pos_start);
+            pastestr(path, pos_line, pos_start);
+        }
+    }else if(strcmp(command, "find") == 0){
+        char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+        int is_count = 0;
+        int is_at = 0;
+        int is_byword = 0;
+        int is_all = 0;
+        char * string;
+        char * path;
+        while (-1)
+        {
+            if(*notAnalyzed != '-'){
+                break;
+            }
+            sscanf(notAnalyzed, "%s", args);
+            if(strcmp(args, "--str") == 0){
+                string = get_string(&notAnalyzed, 1, 0);
+            }else if(strcmp(args, "--file") == 0){
+                path = get_path(&notAnalyzed);
+            }else{
+                while(-1){
+                    if(*notAnalyzed != '-'){
+                        break;
+                    }
+                    notAnalyzed += strlen(args) + 1;
+                    if(strcmp(args, "-count") == 0){
+                        is_count = 1;
+                    }else if(strcmp(args, "-at") == 0){
+                        is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
+                        notAnalyzed += step_to(notAnalyzed, ' ') + 1;
+                    }else if(strcmp(args, "-byword") == 0){
+                        is_byword = 1;
+                    }else if(strcmp(args, "-all") == 0){
+                        is_all = 1;
+                    }
+                    if(*(notAnalyzed - 1) != ' '){
+                        break;
+                    }
+                }
+            }
+        }
+        if(file_exist(path)){
+            find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
+        }
+    }else if(strcmp(command, "replace") == 0){
+        char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+        int is_at = 0;
+        int is_all = 0;
+        char * string1;
+        char * string2;
+        char * path;
+        while (-1)
+        {
+            if(*notAnalyzed != '-'){
+                break;
+            }
+            sscanf(notAnalyzed, "%s", args);
+            if(strcmp(args, "--str1") == 0){
+                string1 = get_string(&notAnalyzed, 1, 1);
+            }else if(strcmp(args, "--str2") == 0){
+                string2 = get_string(&notAnalyzed, 1, 1);
+            }else if(strcmp(args, "--file") == 0){
+                path = get_path(&notAnalyzed);
+            }else if(strcmp(args, "-at") == 0){
+                if(is_all){
+                    puts("Invalid arg. can't set -at with -all");
+                }
+                notAnalyzed += strlen(args) + 1;
+                is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
+                notAnalyzed += step_to(notAnalyzed, ' ') + 1;
+            }else if(strcmp(args, "-all") == 0){
+                if(is_at){
+                    puts("Invalid arg. can't set -at with -all");
+                }
+                notAnalyzed += strlen(args) + 1;
+                is_all = 1;
+            }
+        }
+        if(file_exist(path)){
+            replace(&notAnalyzed, path, string1, string2, is_at, is_all);
+        }
+    }else if(strcmp(command, "grep") == 0){
+        char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
+        int is_c = 0;
+        int is_l = 0;
+        char * string;
+        char * paths[MAX_MULTIPATHS];
+        int paths_counter = 0;
+        while (-1)
+        {
+            if(*notAnalyzed != '-'){
+                break;
+            }
+            sscanf(notAnalyzed, "%s", args);
+            if(strcmp(args, "--str") == 0){
+                string = get_string(&notAnalyzed, 1, 0);
+            }else if(strcmp(args, "--files") == 0){
+                paths_counter = get_multipath(&notAnalyzed , paths);
+            }else if(strcmp(args, "-l") == 0){
+                if(is_c){
+                    puts("Invalid arg. can't set -c with -l");
+                    continue;
+                }
+                notAnalyzed += strlen(args) + 1;
+                is_l = 1;
+            }else if(strcmp(args, "-c") == 0){
+                if(is_l){
+                    puts("Invalid arg. can't set -c with -l");
+                    continue;
+                }
+                notAnalyzed += strlen(args) + 1;
+                is_c = 1;
+            }
+        }
+        if(multifile_exist(paths, paths_counter)){
+            grep(&notAnalyzed, paths, paths_counter, string, is_c, is_l);
+        }
+    }else if(strcmp(command, "undo") == 0){
+        char * path = get_path(&notAnalyzed);
+        if(file_exist(path)) {
+            undo(path);
+        }
+    }
+}
+
 int main()
 {
     char * line = (char *)malloc((MAX_LINE + 1) * sizeof(char));
-    char * command = (char *)malloc((MAX_LINE + 1) * sizeof(char));
-
+    
     while (-1)
     {
         //get line
-        char * notAnalyzed = line;
         fgets(line, MAX_LINE, stdin);
-
-        //replace \n
         line[strlen(line) - 1] = '\0';
+        run(line);
 
-        //explode line to command
-        sscanf(notAnalyzed, "%s", command);
-        notAnalyzed += strlen(command) + 1;
-
-        //command switch
-        if(strcmp(command, "createfile") == 0){
-            char * path = get_path(&notAnalyzed);
-            createfile(path);
-        }else if(strcmp(command, "insertstr") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)){
-                char * string = get_string(&notAnalyzed, 0, 0);
-                int pos_line;
-                int pos_start;
-                get_pos(&notAnalyzed, &pos_line, &pos_start);
-
-                insertstr(path, string, pos_line, pos_start);
-            }
-        }else if(strcmp(command, "cat") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)){
-                puts(read_file(path));
-            }
-        }else if(strcmp(command, "removestr") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)) {
-                int pos_line;
-                int pos_start;
-                get_pos(&notAnalyzed, &pos_line, &pos_start);
-                int size;
-                get_size(&notAnalyzed, &size);
-                int type;
-                get_bf(&notAnalyzed, &type);
-                removestr(path, pos_line, pos_start, size, type);
-            }
-        }else if(strcmp(command, "copystr") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)){
-                int pos_line;
-                int pos_start;
-                get_pos(&notAnalyzed, &pos_line, &pos_start);
-                //printf("%d %d\n", pos_line, pos_start);
-                int size;
-                get_size(&notAnalyzed, &size);
-                int type;
-                get_bf(&notAnalyzed, &type);
-                copystr(path, pos_line, pos_start, size, type);
-            }
-        }else if(strcmp(command, "cutstr") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)) {
-                int pos_line;
-                int pos_start;
-                get_pos(&notAnalyzed, &pos_line, &pos_start);
-                int size;
-                get_size(&notAnalyzed, &size);
-                int type;
-                get_bf(&notAnalyzed, &type);
-                cutstr(path, pos_line, pos_start, size, type);
-            }
-        }else if(strcmp(command, "pastestr") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)){
-                int pos_line;
-                int pos_start;
-                get_pos(&notAnalyzed, &pos_line, &pos_start);
-                pastestr(path, pos_line, pos_start);
-            }
-        }else if(strcmp(command, "find") == 0){
-            char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
-            int is_count = 0;
-            int is_at = 0;
-            int is_byword = 0;
-            int is_all = 0;
-            char * string;
-            char * path;
-            while (-1)
-            {
-                if(*notAnalyzed != '-'){
-                    break;
-                }
-                sscanf(notAnalyzed, "%s", args);
-                if(strcmp(args, "--str") == 0){
-                    string = get_string(&notAnalyzed, 1, 0);
-                }else if(strcmp(args, "--file") == 0){
-                    path = get_path(&notAnalyzed);
-                }else{
-                    while(-1){
-                        if(*notAnalyzed != '-'){
-                            break;
-                        }
-                        notAnalyzed += strlen(args) + 1;
-                        if(strcmp(args, "-count") == 0){
-                            is_count = 1;
-                        }else if(strcmp(args, "-at") == 0){
-                            is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
-                            notAnalyzed += step_to(notAnalyzed, ' ') + 1;
-                        }else if(strcmp(args, "-byword") == 0){
-                            is_byword = 1;
-                        }else if(strcmp(args, "-all") == 0){
-                            is_all = 1;
-                        }
-                        if(*(notAnalyzed - 1) != ' '){
-                            break;
-                        }
-                    }
-                }
-            }
-            if(file_exist(path)){
-                find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
-            }
-        }else if(strcmp(command, "replace") == 0){
-            char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
-            int is_at = 0;
-            int is_all = 0;
-            char * string1;
-            char * string2;
-            char * path;
-            while (-1)
-            {
-                if(*notAnalyzed != '-'){
-                    break;
-                }
-                sscanf(notAnalyzed, "%s", args);
-                if(strcmp(args, "--str1") == 0){
-                    string1 = get_string(&notAnalyzed, 1, 1);
-                }else if(strcmp(args, "--str2") == 0){
-                    string2 = get_string(&notAnalyzed, 1, 1);
-                }else if(strcmp(args, "--file") == 0){
-                    path = get_path(&notAnalyzed);
-                }else if(strcmp(args, "-at") == 0){
-                    if(is_all){
-                        puts("Invalid arg. can't set -at with -all");
-                    }
-                    notAnalyzed += strlen(args) + 1;
-                    is_at = string_to_int(notAnalyzed, step_to(notAnalyzed, ' '));
-                    notAnalyzed += step_to(notAnalyzed, ' ') + 1;
-                }else if(strcmp(args, "-all") == 0){
-                    if(is_at){
-                        puts("Invalid arg. can't set -at with -all");
-                    }
-                    notAnalyzed += strlen(args) + 1;
-                    is_all = 1;
-                }
-            }
-            if(file_exist(path)){
-                replace(&notAnalyzed, path, string1, string2, is_at, is_all);
-            }
-        }else if(strcmp(command, "grep") == 0){
-            char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
-            int is_c = 0;
-            int is_l = 0;
-            char * string;
-            char * paths[MAX_MULTIPATHS];
-            int paths_counter = 0;
-            while (-1)
-            {
-                if(*notAnalyzed != '-'){
-                    break;
-                }
-                sscanf(notAnalyzed, "%s", args);
-                if(strcmp(args, "--str") == 0){
-                    string = get_string(&notAnalyzed, 1, 0);
-                }else if(strcmp(args, "--files") == 0){
-                    paths_counter = get_multipath(&notAnalyzed , paths);
-                }else if(strcmp(args, "-l") == 0){
-                    if(is_c){
-                        puts("Invalid arg. can't set -c with -l");
-                        continue;
-                    }
-                    notAnalyzed += strlen(args) + 1;
-                    is_l = 1;
-                }else if(strcmp(args, "-c") == 0){
-                    if(is_l){
-                        puts("Invalid arg. can't set -c with -l");
-                        continue;
-                    }
-                    notAnalyzed += strlen(args) + 1;
-                    is_c = 1;
-                }
-            }
-            if(multifile_exist(paths, paths_counter)){
-                grep(&notAnalyzed, paths, paths_counter, string, is_c, is_l);
-            }
-        }else if(strcmp(command, "undo") == 0){
-            char * path = get_path(&notAnalyzed);
-            if(file_exist(path)) {
-                undo(path);
-            }
-        }
     }
-
     return 0;
 }
