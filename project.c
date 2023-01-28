@@ -15,13 +15,13 @@
 #define MAX_UNDO_COMMAND 2000
 
 
-void run(char * line);
+void run(char * line, int is_undo);
 void createfile(char * path);
-void add_string_to_file(char * path, char * string, int mode, int fol);
+void add_string_to_file(char * path, char * string, int mode);
 int insertstr(char * path, char * string, int line, int start);
-void removestr(char * path, int line, int start, int size, int type);
+char * removestr(char * path, int line, int start, int size, int type);
 void copystr(char * path, int line, int start, int size, int type);
-void cutstr(char * path, int line, int start, int size, int type);
+char * cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
 void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
 void replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all);
@@ -39,7 +39,9 @@ void get_bf(char ** line, int * type);
 int step_to(char * line, char to);
 int file_exist(char * path);
 int folder_exist(char * path);
+void add_history(int type, char * path, int lenght, char * string, char * pos);
 int get_index_of_pos(char * path,int line,int start);
+char * get_pos_of_index(char * path,int index);
 char * get_path(char ** line);
 char * get_string(char ** line, int effect_on_star, int offset);
 char * read_file(char * path);
@@ -77,16 +79,13 @@ void createfile(char * path){
     fclose(file_to_make);
 }
 
-void add_string_to_file(char * path, char * string, int mode, int fol){
+void add_string_to_file(char * path, char * string, int mode){
     if(mode == 1){
         FILE *file = fopen(path, "w");
         fwrite(string, sizeof(char), strlen(string), file);
         fclose(file);
     }else if(mode == 2){
         FILE *file = fopen(path, "a");
-        if(fol){
-            rewind(file);
-        }
         fwrite(string, sizeof(char), strlen(string), file);
         fclose(file);
     }
@@ -115,18 +114,18 @@ int insertstr(char * path, char * string, int line, int start){
     char temp = *(file_data + index);
     *(file_data + index) = '\0';
 
-    add_string_to_file(path, file_data, 1, 0);
-    add_string_to_file(path, string, 2, 0);
+    add_string_to_file(path, file_data, 1);
+    add_string_to_file(path, string, 2);
 
     *(file_data + index) = temp;
     file_data += index;
 
-    add_string_to_file(path, file_data, 2, 0);
+    add_string_to_file(path, file_data, 2);
 
     return strlen(string);
 }
 
-void removestr(char * path, int line, int start, int size, int type){
+char * removestr(char * path, int line, int start, int size, int type){
     char * file_data = read_file(path);
     int index = get_index_of_pos(path, line, start);
 
@@ -134,22 +133,36 @@ void removestr(char * path, int line, int start, int size, int type){
         char temp = *(file_data + index);
         *(file_data + index) = '\0';
 
-        add_string_to_file(path, file_data, 1, 0);
+        add_string_to_file(path, file_data, 1);
 
         *(file_data + index) = temp;
-        file_data += index + size;
+        file_data += index;
+        char * ret = (char *)malloc((MAX_STRING + 1) * sizeof(char));
+        for(int i = 0;i < size; i++){
+            *(ret + i) = *(file_data + i);
+        }
+        *(ret + size) = '\0';
 
-        add_string_to_file(path, file_data, 2, 0);
+        file_data += size;
+
+        add_string_to_file(path, file_data, 2);
+        return ret;
     }else if(type == 2){
         char temp = *(file_data + index - size);
         *(file_data + index - size) = '\0';
 
-        add_string_to_file(path, file_data, 1, 0);
+        add_string_to_file(path, file_data, 1);
 
         *(file_data + index - size) = temp;
-        file_data += index;
+        file_data += index - size;
+        char * ret = (char *)malloc((MAX_STRING + 1) * sizeof(char));
+        for(int i = 0; i < size; i++){
+            *(ret + i) = *(file_data + i);
+        }
+        file_data += size;
 
-        add_string_to_file(path, file_data, 2, 0);
+        add_string_to_file(path, file_data, 2);
+        return ret;
     }
 }
 
@@ -159,52 +172,65 @@ void copystr(char * path, int line, int start, int size, int type){
     if(type == 1){
         file_data += index;
         *(file_data + size) = '\0';
-        add_string_to_file("copycut.txt", file_data, 1, 0);
+        add_string_to_file("copycut.txt", file_data, 1);
     }else if(type == 2){
         *(file_data + index) = '\0';
         file_data += index - size;
 
-        add_string_to_file("copycut.txt", file_data, 1, 0);
+        add_string_to_file("copycut.txt", file_data, 1);
     }
 }
 
-void cutstr(char * path, int line, int start, int size, int type){
+char * cutstr(char * path, int line, int start, int size, int type){
     char * file_data = read_file(path);
     int index = get_index_of_pos(path, line, start);
+    char * string = (char *)malloc((MAX_STRING + 1) * sizeof(char));
     if(type == 1){
         file_data += index;
         *(file_data + size) = '\0';
-
-        add_string_to_file("copycut.txt", file_data, 1, 0);
+        for (int  i = 0; i < size; i++)
+        {
+            *(string + i) = *(file_data + i);
+        }
+        *(string + size) = '\0';
+        
+        add_string_to_file("copycut.txt", file_data, 1);
     }else if(type == 2){
         *(file_data + index) = '\0';
         file_data += index - size;
+        for (int  i = 0; i < size; i++)
+        {
+            *(string + i) = *(file_data + i);
+        }
+        *(string + size) = '\0';
 
-        add_string_to_file("copycut.txt", file_data, 1, 0);
+        add_string_to_file("copycut.txt", file_data, 1);
     }
+
     file_data = read_file(path);
 
     if(type == 1){
         char temp = *(file_data + index);
         *(file_data + index) = '\0';
 
-        add_string_to_file(path, file_data, 1, 0);
+        add_string_to_file(path, file_data, 1);
 
         *(file_data + index) = temp;
         file_data += index + size;
 
-        add_string_to_file(path, file_data, 2, 0);
+        add_string_to_file(path, file_data, 2);
     }else if(type == 2){
         char temp = *(file_data + index - size);
         *(file_data + index - size) = '\0';
 
-        add_string_to_file(path, file_data, 1, 0);
+        add_string_to_file(path, file_data, 1);
 
         *(file_data + index - size) = temp;
         file_data += index;
 
-        add_string_to_file(path, file_data, 2, 0);
+        add_string_to_file(path, file_data, 2);
     }
+    return string;
 }
 
 void pastestr(char * path, int line, int start){
@@ -216,13 +242,13 @@ void pastestr(char * path, int line, int start){
     char temp = *(file_data + index);
     *(file_data + index) = '\0';
 
-    add_string_to_file(path, file_data, 1, 0);
-    add_string_to_file(path, Ced_text, 2, 0);
+    add_string_to_file(path, file_data, 1);
+    add_string_to_file(path, Ced_text, 2);
 
     *(file_data + index) = temp;
     file_data += index;
 
-    add_string_to_file(path, file_data, 2, 0);
+    add_string_to_file(path, file_data, 2);
 }
 
 void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all){
@@ -245,11 +271,11 @@ void replace(char ** line, char * path, char * string1, char * string2, int is_a
                 file_data = read_file(path);
                 char tmp = *(file_data + *(indexes_first + i));
                 *(file_data + *(indexes_first + i)) = '\0';
-                add_string_to_file(path, file_data, 1, 0);
-                add_string_to_file(path, string2, 2, 0);
+                add_string_to_file(path, file_data, 1);
+                add_string_to_file(path, string2, 2);
                 *(file_data + *(indexes_first + i)) = tmp;
                 file_data += *(indexes_last + i) + 1;
-                add_string_to_file(path, file_data, 2, 0);
+                add_string_to_file(path, file_data, 2);
                 for(int j = i+1; j < counter; j++){
                     *(indexes_first + j) -= ((*(indexes_last + i) - *(indexes_first + i)) - strlen(string2) + 1);
                     *(indexes_last + j) -= ((*(indexes_last + i) - *(indexes_first + i)) - strlen(string2) + 1);
@@ -262,22 +288,22 @@ void replace(char ** line, char * path, char * string1, char * string2, int is_a
         }
         char tmp = *(file_data + *(indexes_first + is_at));
         *(file_data + *(indexes_first + is_at)) = '\0';
-        add_string_to_file(path, file_data, 1, 0);
-        add_string_to_file(path, string2, 2, 0);
+        add_string_to_file(path, file_data, 1);
+        add_string_to_file(path, string2, 2);
         *(file_data + *(indexes_first + is_at)) = tmp;
         file_data += *(indexes_last + is_at) + 1;
-        add_string_to_file(path, file_data, 2, 0);
+        add_string_to_file(path, file_data, 2);
     }else{
         if(counter == 0){
             printf("%d\n", -1);
         }else{
             char tmp = *(file_data + *(indexes_first));
             *(file_data + *(indexes_first)) = '\0';
-            add_string_to_file(path, file_data, 1, 0);
-            add_string_to_file(path, string2, 2, 0);
+            add_string_to_file(path, file_data, 1);
+            add_string_to_file(path, string2, 2);
             *(file_data + *(indexes_first)) = tmp;
             file_data += *(indexes_last) + 1;
-            add_string_to_file(path, file_data, 2, 0);
+            add_string_to_file(path, file_data, 2);
         }
     }
     puts("success");
@@ -344,10 +370,10 @@ void undo(char * path){
             //make_undo(history, i);
             int step = step_to(history, 10);
             *(history + step) = '\0';
-            run(history);
+            run(history, 1);
             *(history + step) = 10;
             history += step + 1;
-            add_string_to_file("history.txt", history, 1, 0);
+            add_string_to_file("history.txt", history, 1);
             break;
         }else{
             history += step_to(history , 10) + 1;
@@ -828,6 +854,30 @@ int get_index_of_pos(char *path,int line,int start){
     return i;
 }
 
+char * get_pos_of_index(char * path,int index){
+    char * file_data = read_file(path);
+    int i = 0;
+    int line_counter = 1;
+    int position_counter = 0;
+    for(int i = 0; i < index; i++){
+
+        if(*(file_data + i) == 10){
+            line_counter++;
+            position_counter=0;
+        }else{
+            position_counter++;
+        }
+    }
+    char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+    char * read = (char *) malloc((MAX_UNDO_COMMAND + 1) * sizeof(char));
+    sprintf(intToStr, "%d", line_counter);
+    strcpy(read, intToStr);
+    strcat(read, ":");
+    sprintf(intToStr, "%d", position_counter);
+    strcat(read, intToStr);
+    return read;
+}
+
 char * get_path(char ** line){
     //end types
     const char end_str_with[] = {' ', '\"'};
@@ -1016,8 +1066,8 @@ long long string_to_int(char * string, int lenght){
     return in;
 }
 
-void add_history(int type, char * path, int lenght, int pos_start, int pos_line){
-    char * newline;
+void add_history(int type, char * path, int lenght, char * string, char * pos){
+    char * newline = (char *) malloc(2 * sizeof(char));
     *newline = (char)10;
     *(newline + 1) = '\0';
     char * read = (char *) malloc((MAX_UNDO_COMMAND + 1) * sizeof(char));
@@ -1030,26 +1080,59 @@ void add_history(int type, char * path, int lenght, int pos_start, int pos_line)
         strcat(read, "\" removestr --file \"/");
         strcat(read, path);
         strcat(read, "\" --pos ");
-        sprintf(intToStr, "%d", pos_line);
-        strcat(read, intToStr);
-        strcat(read, ":");
-        sprintf(intToStr, "%d", pos_start);
-        strcat(read, intToStr);
+        strcat(read, pos);
         strcat(read, " -size ");
         sprintf(intToStr, "%d", lenght);
         strcat(read, intToStr);
         strcat(read, " -f");
         strcat(read, newline);
-        add_string_to_file("history.txt", read, 2, 1);
+        insertstr("history.txt", read, 1, 0);
         break;
     
     case 2:
+        strcpy(read, "--file \"/");
+        strcat(read, path);
+        strcat(read, "\" insertstr --file \"/");
+        strcat(read, path);
+        strcat(read, "\" --str ");
+        strcat(read, string);
+        strcat(read, " --pos ");
+        strcat(read, pos);
+        strcat(read, newline);
+        insertstr("history.txt", read, 1, 0);
+        break;
 
+    case 3:
+        strcpy(read, "--file \"/");
+        strcat(read, path);
+        strcat(read, "\" insertstr --file \"/");
+        strcat(read, path);
+        strcat(read, "\" --str ");
+        strcat(read, string);
+        strcat(read, " --pos ");
+        strcat(read, pos);
+        strcat(read, newline);
+        insertstr("history.txt", read, 1, 0);
+        break;
+
+    case 4:
+        strcpy(read, "--file \"/");
+        strcat(read, path);
+        strcat(read, "\" removestr --file \"/");
+        strcat(read, path);
+        strcat(read, "\" --pos ");
+        strcat(read, pos);
+        strcat(read, " -size ");
+        sprintf(intToStr, "%d", lenght);
+        strcat(read, intToStr);
+        strcat(read, " -f");
+        strcat(read, newline);
+        insertstr("history.txt", read, 1, 0);
         break;
     }
 }
 
-void run(char * line){
+void run(char * line, int is_undo){
     char * command = (char *)malloc((MAX_LINE + 1) * sizeof(char));
     char * notAnalyzed = line;
 
@@ -1069,7 +1152,16 @@ void run(char * line){
             int pos_start;
             get_pos(&notAnalyzed, &pos_line, &pos_start);
             int lenght = insertstr(path, string, pos_line, pos_start);
-            add_history(1, path, lenght, pos_start, pos_line);
+            char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+            char * pos = (char *) malloc((MAX_UNDO_COMMAND + 1) * sizeof(char));
+            sprintf(intToStr, "%d", pos_line);
+            strcpy(pos, intToStr);
+            strcat(pos, ":");
+            sprintf(intToStr, "%d", pos_start);
+            strcat(pos, intToStr);
+            if(!is_undo){
+                add_history(1, path, lenght, "", pos);
+            }
         }
     }else if(strcmp(command, "cat") == 0){
         char * path = get_path(&notAnalyzed);
@@ -1078,6 +1170,7 @@ void run(char * line){
         }
     }else if(strcmp(command, "removestr") == 0){
         char * path = get_path(&notAnalyzed);
+        char * string;
         if(file_exist(path)) {
             int pos_line;
             int pos_start;
@@ -1086,7 +1179,14 @@ void run(char * line){
             get_size(&notAnalyzed, &size);
             int type;
             get_bf(&notAnalyzed, &type);
-            removestr(path, pos_line, pos_start, size, type);
+            int index = get_index_of_pos(path, pos_line, pos_start);
+            if(type == 2){
+                index -= size;
+            }
+            string = removestr(path, pos_line, pos_start, size, type);
+            if(!is_undo){
+                add_history(2, path, 0, string, get_pos_of_index(path, index));
+            }
         }
     }else if(strcmp(command, "copystr") == 0){
         char * path = get_path(&notAnalyzed);
@@ -1111,7 +1211,14 @@ void run(char * line){
             get_size(&notAnalyzed, &size);
             int type;
             get_bf(&notAnalyzed, &type);
-            cutstr(path, pos_line, pos_start, size, type);
+            int index = get_index_of_pos(path, pos_line, pos_start);
+            if(type == 2){
+                index -= size;
+            }
+            char * string = cutstr(path, pos_line, pos_start, size, type);
+            if(!is_undo){
+                add_history(3, path, 0, string, get_pos_of_index(path, index));
+            }
         }
     }else if(strcmp(command, "pastestr") == 0){
         char * path = get_path(&notAnalyzed);
@@ -1119,7 +1226,18 @@ void run(char * line){
             int pos_line;
             int pos_start;
             get_pos(&notAnalyzed, &pos_line, &pos_start);
+            int lenght = strlen(read_file("copycut.txt"));
             pastestr(path, pos_line, pos_start);
+            char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+            char * pos = (char *) malloc((MAX_UNDO_COMMAND + 1) * sizeof(char));
+            sprintf(intToStr, "%d", pos_line);
+            strcpy(pos, intToStr);
+            strcat(pos, ":");
+            sprintf(intToStr, "%d", pos_start);
+            strcat(pos, intToStr);
+            if(!is_undo){
+                add_history(4, path, lenght, "", pos);
+            }
         }
     }else if(strcmp(command, "find") == 0){
         char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
@@ -1254,7 +1372,7 @@ int main()
         //get line
         fgets(line, MAX_LINE, stdin);
         line[strlen(line) - 1] = '\0';
-        run(line);
+        run(line, 0);
 
     }
     return 0;
