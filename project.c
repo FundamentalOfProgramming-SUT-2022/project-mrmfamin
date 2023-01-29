@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <math.h>
 
 #define MAX_LINE 20000
@@ -49,6 +50,9 @@ long long string_to_int(char * string, int lenght);
 void auto_indent(char ** line, char * path);
 char * auto_indent_rec(char * file_data, int index_edn, int blok_count);
 int where_closed(char * file_data, int index);
+int isDir(const char* fileName);
+char * tree(int depth, int depth_now, char * path);
+
 
 void createfile(char * path){
     char * path_to_make = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
@@ -1242,6 +1246,51 @@ void add_history(int type, char * path, int lenght, char * string, char * pos){
     }
 }
 
+char * tree(int depth, int depth_now, char * path){
+    if(depth_now-1 == depth){
+        return "";
+    }
+    char * newline = (char *) malloc(2 * sizeof(char));
+    *newline = (char)10;
+    *(newline + 1) = '\0';
+
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(path);
+    char * direct = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
+    char * depth_them = (char *)malloc((MAX_PATH_ADDRESS + 1) * sizeof(char));
+    char * data = (char *)malloc((MAX_STRING + 1) * sizeof(char));
+    strcpy(data, "");
+    strcpy(depth_them, "");
+    for(int i = 1; i < depth_now; i++){
+        strcat(depth_them, "|____ ");
+    }
+    if (d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            strcpy(direct, path);
+            strcat(direct, dir->d_name);
+            strcat(direct, "/");
+            if(!dir->d_type){
+                strcat(data, depth_them);
+                strcat(data, dir->d_name);
+                strcat(data, newline);
+            }else{
+                if(strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0){
+                    strcat(data, depth_them);
+                    strcat(data, dir->d_name);
+                    strcat(data, ":");
+                    strcat(data, newline);
+                    strcat(data, tree(depth, depth_now+1, direct));
+                }
+            }
+        }
+        closedir(d);
+    }
+    return data;
+}
+
 void run(char * line, int is_undo){
     char * command = (char *)malloc((MAX_LINE + 1) * sizeof(char));
     char * notAnalyzed = line;
@@ -1487,6 +1536,11 @@ void run(char * line, int is_undo){
         if(!is_undo){
             add_history(5, path, 0, old_data, "");
         }
+    }else if(strcmp(command, "tree") == 0){
+        int depth;
+        sscanf(notAnalyzed, "%d", &depth);
+        char * trees = tree(depth, 1, "root/");
+        printf("%s", trees);
     }
 }
 
