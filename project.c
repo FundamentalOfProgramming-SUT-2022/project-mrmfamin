@@ -1114,7 +1114,7 @@ char * auto_indent_rec(char * file_data, int index_end, int blok_count){
         }
         file_data += offset;
         int step_to_ac_open = step_to(file_data, '{');
-        int last = 0;
+        int last = -1;
         for (int i = 0; i < step_to_ac_open; i++)
         {
             if(*(file_data + i) != ' ' && *(file_data + i) != (char)10){
@@ -1125,8 +1125,11 @@ char * auto_indent_rec(char * file_data, int index_end, int blok_count){
         char tmp = *(file_data + last + 1);
         *(file_data + last + 1) = '\0';
         strcat(data, file_data);
+        if(strlen(file_data) != 0){
+            strcat(data, " ");
+        }
         *(file_data + last + 1) = tmp;
-        strcat(data, " {");
+        strcat(data, "{");
         strcat(data, newline);
         strcat(data, auto_indent_rec(file_data + step_to_ac_open + 1, where_closed(file_data, step_to_ac_open + 1), blok_count + 1));
         strcat(data, block_white);
@@ -1151,7 +1154,7 @@ int where_closed(char * file_data, int index){
         }
         i++;
     }
-    int last = 0;
+    int last = -1;
     for(int b = 0; b < i; b++){
         if(*(file_data + index + b) != ' ' && *(file_data + index + b) != (char)10){
             last = b;
@@ -1477,8 +1480,12 @@ void run(char * line, int is_undo){
         }
     }else if(strcmp(command, "auto-indent") == 0){
         char * path = get_path(&notAnalyzed);
+        char * old_data = read_file(path);
         if(file_exist(path)) {
             auto_indent(&notAnalyzed, path);
+        }
+        if(!is_undo){
+            add_history(5, path, 0, old_data, "");
         }
     }
 }
@@ -1493,7 +1500,6 @@ int main()
         fgets(line, MAX_LINE, stdin);
         line[strlen(line) - 1] = '\0';
         run(line, 0);
-
     }
     return 0;
 }
