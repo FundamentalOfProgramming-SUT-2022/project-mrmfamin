@@ -15,8 +15,7 @@
 #define MAX_FIND_INDEX 500
 #define MAX_UNDO_COMMAND 2000
 
-
-void run(char * line, int is_undo);
+void run(char * line, int is_undo, int is_arman, char * arman_data);
 void createfile(char * path);
 void add_string_to_file(char * path, char * string, int mode);
 int insertstr(char * path, char * string, int line, int start);
@@ -24,15 +23,15 @@ char * removestr(char * path, int line, int start, int size, int type);
 void copystr(char * path, int line, int start, int size, int type);
 char * cutstr(char * path, int line, int start, int size, int type);
 void pastestr(char * path, int line, int start);
-void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
+char * find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all);
 char * replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all);
-void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l);
+char * grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l);
 void undo(char * path);
-void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l);
+char * return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l);
 //int find_complate(char * file_data , char * string ,int is_count ,int is_at ,int is_byword ,int is_all, int * indexes);
 int find_complate(char * file_data , char * string, int * indexes);
 int replace_complate(char * file_data , char * string1, int * indexes_first, int * indexes_last);
-void return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count);
+char * return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count);
 int index_to_byword(int index, char * file_data);
 void get_pos(char ** line, int * pos_line, int * pos_start);
 void get_size(char ** line, int * size);
@@ -47,10 +46,11 @@ char * get_path(char ** line);
 char * get_string(char ** line, int effect_on_star, int offset);
 char * read_file(char * path);
 long long string_to_int(char * string, int lenght);
+long long pow_m(int x, int y);
 void auto_indent(char ** line, char * path);
 char * auto_indent_rec(char * file_data, int index_edn, int blok_count);
 int where_closed(char * file_data, int index);
-int isDir(const char* fileName);
+int number_of_digits (int n);
 char * tree(int depth, int depth_now, char * path);
 
 
@@ -144,6 +144,7 @@ char * removestr(char * path, int line, int start, int size, int type){
 
         *(file_data + index) = temp;
         file_data += index;
+
         char * ret = (char *)malloc((MAX_STRING + 1) * sizeof(char));
         for(int i = 0;i < size; i++){
             *(ret + i) = *(file_data + i);
@@ -258,11 +259,11 @@ void pastestr(char * path, int line, int start){
     add_string_to_file(path, file_data, 2);
 }
 
-void find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all){
+char * find(char ** line, char * path, char * string, int is_count, int is_byword, int is_at, int is_all){
     char * file_data = read_file(path);
     int * indexes = (int *)malloc((MAX_FIND_INDEX) * sizeof(int));
     int counter = find_complate(file_data, string, indexes);
-    return_find(file_data, indexes, counter, is_at, is_all, is_byword, is_count);
+    return return_find(file_data, indexes, counter, is_at, is_all, is_byword, is_count);
 }
 
 char * replace(char ** line, char * path, char * string1, char * string2, int is_at, int is_all){
@@ -314,17 +315,18 @@ char * replace(char ** line, char * path, char * string1, char * string2, int is
             add_string_to_file(path, file_data, 2);
         }
     }
-    puts("success");
     return old_fileData;
 }
 
-void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l){
+char * grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,int is_l){
     int * indexes;
     char * file_data;
     int fd_counter;
     int st_counter;
     int index_find;
     int counter = 0;
+    char * data = (char *)malloc((MAX_STRING + 1) * sizeof(char));
+    strcpy(data, "");
     for (int i = 0; i < paths_counter; i++)
     {
         file_data = read_file(*(paths + i));
@@ -350,23 +352,30 @@ void grep(char ** line, char ** paths, int paths_counter,char * string,int is_c,
                 continue;
             }
             if(*(file_data + fd_counter) != *(string + st_counter)){
+                if(*(file_data + fd_counter) == 10){
+                    index_find = fd_counter + 1;
+                }
                 fd_counter++;
                 st_counter = 0;
                 if(*(file_data + fd_counter) == '\0'){
                     break;
                 }
             }else if (*(file_data + fd_counter) == *(string + st_counter)){
+                if(*(file_data + fd_counter) == 10){
+                    index_find = fd_counter + 1;
+                }
                 fd_counter++;
                 st_counter++;
             }
         }
         if(!is_c){
-            return_grep(indexes, counter, *(paths + i), file_data, is_c, is_l);
+            strcat(data, return_grep(indexes, counter, *(paths + i), file_data, is_c, is_l));
         }
     }
     if(is_c){
-        return_grep(indexes, counter, *(paths), file_data, is_c, is_l);
+        data = return_grep(indexes, counter, *(paths), file_data, is_c, is_l);
     }
+    return data;
 }
 
 void undo(char * path){
@@ -379,7 +388,7 @@ void undo(char * path){
             //make_undo(history, i);
             int step = step_to(history, -100) + 1;
             *(history + step) = '\0';
-            run(history, 1);
+            run(history, 1, 0, "");
             *(history + step) = 10;
             history += step + 1;
             add_string_to_file("history.txt", history, 1);
@@ -390,44 +399,63 @@ void undo(char * path){
     }
 }
 
-void return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l){
+char * return_grep(int * indexes, int counter, char * path_name, char * file_read, int is_c, int is_l){
+    char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+    char * newline = (char *) malloc(2 * sizeof(char));
+    *(newline) = (char)10;
+    *(newline + 1) = '\0';
+    char * data = (char *)malloc((MAX_STRING + 1) * sizeof(char));
+    strcpy(data, "");
     if(is_l){
         if(counter > 0){
-            int j = 0;
-            while(-1){
-                if(*(path_name + j) == '\0'){
-                    break;
-                }
-                printf("%c", *(path_name + j));
-                j++;
-            }
-            printf("\n");
+            // int j = 0;
+            // while(-1){
+            //     if(*(path_name + j) == '\0'){
+            //         break;
+            //     }
+            //     j++;
+            // }
+            //printf("%s", path_name);
+            //printf("\n");
+            strcat(data, path_name);
+            strcat(data, newline);
         }
     }else if(is_c){
-        printf("%d\n", counter);
+        sprintf(intToStr, "%d", counter);
+        strcat(data, intToStr);
+        strcat(data, newline);
+        //printf("%d\n", counter);
     }else{
         for(int i = 0; i < counter; i++){
+            // int j = 0;
+            // while(-1){
+            //     if(*(path_name + j) == '\0'){
+            //         break;
+            //     }
+            //     printf("%c", *(path_name + j));
+            //     j++;
+            // }
+            //printf(": ");
+            strcat(data, path_name);
+            strcat(data, ": ");
             int j = 0;
-            while(-1){
-                if(*(path_name + j) == '\0'){
-                    break;
-                }
-                printf("%c", *(path_name + j));
-                j++;
-            }
-            printf(": ");
-            j = 0;
+            char * c = (char *)malloc(2 * sizeof(char));
             while (-1)
             {
                 if(*(file_read + j + *(indexes + i)) == '\n' || *(file_read + j) == '\0'){
                     break;
                 }
-                printf("%c", *(file_read + j + *(indexes + i)));
+                //printf("%c", *(file_read + j + *(indexes + i)));
+                sprintf(c, "%c", *(file_read + j + *(indexes + i)));
+                strcat(data, c);
                 j++;
             }
-            printf("\n");
+            strcat(data, newline);
+            //printf("\n");
         }
     }
+
+    return data;
 }
 
 /*
@@ -644,61 +672,87 @@ int replace_complate(char * file_data , char * string1, int * indexes_first, int
     }
 }
 
-void return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count){
+char * return_find(char * file_data, int * indexes, int counter, int is_at, int is_all, int is_byword, int is_count){
     //printf("count: %d, byword: %d, at: %d, all: %d\n", is_count, is_byword, is_at, is_all);
+    char * data = (char *) malloc((MAX_STRING + 1) * sizeof(char));
+    char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+    char * newline = (char *) malloc(2 * sizeof(char));
+    *(newline) = (char)10;
+    *(newline + 1) = '\0';
+    strcpy(data, "");
     if(is_count){
         if(is_all || is_at || is_byword){
             puts("Invalid args");
-            return;
+            return data;
         }
-        printf("%d\n", counter);
+
+        sprintf(intToStr, "%d", counter);
+        strcat(data, intToStr);
+        //printf("%d\n", counter);
     }else if(is_byword){
         if(counter == 0){
-            printf("%d\n", -1);
+            sprintf(intToStr, "%d", -1);
+            strcat(data, intToStr);
         }else{
             if(!is_at && !is_all){
-                printf("%d\n",index_to_byword(*(indexes), file_data));
+                //printf("%d\n",index_to_byword(*(indexes), file_data));
+                sprintf(intToStr, "%d", index_to_byword(*(indexes), file_data));
+                strcat(data, intToStr);
             }else{
                 if(is_at){
                     if(counter < is_at){
-                        printf("%d\n", -1);
+                        sprintf(intToStr, "%d", -1);
+                        strcat(data, intToStr);
                     }else{
-                        printf("%d\n",index_to_byword(*(indexes + is_at - 1), file_data));
+                        sprintf(intToStr, "%d", index_to_byword(*(indexes + is_at - 1), file_data));
+                        strcat(data, intToStr);
+                        //printf("%d\n",index_to_byword(*(indexes + is_at - 1), file_data));
                     }
                 }else if(is_all){
                     for(int i = 0; i < counter; i++){
-                        printf("%d", index_to_byword(*(indexes + i), file_data));
+                        sprintf(intToStr, "%d", index_to_byword(*(indexes + i), file_data));
+                        strcat(data, intToStr);
+                        //printf("%d", index_to_byword(*(indexes + i), file_data));
                         if(i != counter-1){
-                            printf(",");
+                            strcat(data, ", ");
+                            //printf(",");
                         }
                     }
-                    printf("\n");
+                    //printf(newline);
                 }
             }
         }
     }else if(is_at){
         if(counter < is_at){
-            printf("%d\n", -1);
+            sprintf(intToStr, "%d", -1);
+            strcat(data, intToStr);
         }else{
-            printf("%d\n",*(indexes + is_at - 1));
+            sprintf(intToStr, "%d", *(indexes + is_at - 1));
+            strcat(data, intToStr);
+            //printf("%d\n",*(indexes + is_at - 1));
         }
     }else if(is_all){
         if(counter == 0){
-            printf("%d\n", -1);
+            sprintf(intToStr, "%d", -1);
+            strcat(data, intToStr);
         }else{
             for(int i = 0; i < counter; i++){
-                printf("%d", *(indexes + i));
+                sprintf(intToStr, "%d", *(indexes + i));
+                strcat(data, intToStr);
+                //printf("%d", *(indexes + i));
                 if(i != counter-1){
-                    printf(",");
+                    strcat(data, ", ");
                 }
             }
-            printf("\n");
         }
     }else{
         if(counter == 0){
-            printf("%d\n", -1);
+            sprintf(intToStr, "%d", -1);
+            strcat(data, intToStr);
         }else{
-            printf("%d\n",*(indexes));
+            sprintf(intToStr, "%d", *(indexes));
+            strcat(data, intToStr);
+            //printf("%d\n",*(indexes));
         }
     }
 }
@@ -861,6 +915,244 @@ int get_index_of_pos(char *path,int line,int start){
         i++;
     }
     return i;
+}
+
+char * compare(char ** line, char * path1, char * path2){
+    char * file1_data = read_file(path1);
+    char * file2_data = read_file(path2);
+    char * intToStr = (char *) malloc((8 + 1) * sizeof(char));
+    char * data = (char *) malloc((MAX_STRING + 1) * sizeof(char));
+    strcpy(data, "");
+    char * newline = (char *) malloc(2 * sizeof(char));
+    *(newline) = (char)10;
+    *(newline + 1) = '\0';
+    int i = 0;
+    int line_counter = 1;
+    while(-1){
+        if(*(file1_data + i) == '\0' && *(file2_data + i) == '\0'){
+            break;
+        }else if(*(file1_data + i) == '\0' && *(file2_data + i) != '\0'){
+            if(*(file2_data + i) == 10){
+                file2_data += i + 1;
+                i = 0;
+                line_counter++;
+            }
+            if(i != 0){
+                int step = step_to(file2_data, 10);
+                strcat(data, "============ ");
+                strcat(data, "#");
+                sprintf(intToStr, "%d", line_counter);
+                strcat(data, intToStr);
+                strcat(data, " ============");
+                strcat(data, newline);
+                char tmp = *(file1_data + i);
+                *(file1_data + i) = '\0';
+                strcat(data, file1_data);
+                strcat(data, newline);
+                *(file1_data + i) = tmp;
+                file1_data += i + 1;
+                tmp = *(file2_data + step);
+                *(file2_data + step) = '\0';
+                strcat(data, file2_data);
+                strcat(data, newline);
+                *(file2_data + step) = tmp;
+                file2_data += step;
+                if(*file2_data != '\0'){
+                    file2_data++;
+                }
+
+                i=0;
+                line_counter++;
+            }
+            int end_line_number = line_counter - 1;
+            int b = 0;
+            while (-1)
+            {
+                if(*(file2_data + b) == 10){
+                    end_line_number++;
+                }else if(*(file2_data + b) == '\0'){
+                    end_line_number++;
+                    // if(*(file2_data + b - 1) != 10){
+                    //     end_line_number++;
+                    // }
+                    break;
+                }
+                b++;
+            }
+            
+            strcat(data, ">>>>>>>>>>>> ");
+            strcat(data, "#");
+            sprintf(intToStr, "%d", line_counter);
+            strcat(data, intToStr);
+            strcat(data, " - #");
+            sprintf(intToStr, "%d", end_line_number);
+            strcat(data, intToStr);
+            strcat(data, " >>>>>>>>>>>>");
+            strcat(data, newline);
+            strcat(data, file2_data);
+
+            break;
+        }else if(*(file2_data + i) == '\0' && *(file1_data + i) != '\0'){
+            if(*(file1_data + i) == 10){
+                file1_data += i + 1;
+                i = 0;
+                line_counter++;
+            }
+            if(i != 0){
+                int step = step_to(file2_data, 10);
+                strcat(data, "============ ");
+                strcat(data, "#");
+                sprintf(intToStr, "%d", line_counter);
+                strcat(data, intToStr);
+                strcat(data, " ============");
+                strcat(data, newline);
+                char tmp = *(file1_data + i);
+                *(file1_data + i) = '\0';
+                strcat(data, file1_data);
+                strcat(data, newline);
+                *(file1_data + i) = tmp;
+                file1_data += i + 1;
+                tmp = *(file2_data + step);
+                *(file2_data + step) = '\0';
+                strcat(data, file2_data);
+                strcat(data, newline);
+                *(file2_data + step) = tmp;
+                file2_data += step;
+                if(*file2_data != '\0'){
+                    file2_data++;
+                }
+
+                i=0;
+                line_counter++;
+            }
+            
+            int end_line_number = line_counter - 1;
+            int b = 0;
+            while (-1)
+            {
+                if(*(file1_data + b) == 10){
+                    end_line_number++;
+                }else if(*(file1_data + b) == '\0'){
+                    end_line_number++;
+                    // if(*(file1_data + b - 1) != 10){
+                    //     end_line_number++;
+                    // }
+                    break;
+                }
+                b++;
+            }
+            
+            strcat(data, "<<<<<<<<<<<< ");
+            strcat(data, "#");
+            sprintf(intToStr, "%d", line_counter);
+            strcat(data, intToStr);
+            strcat(data, " - #");
+            sprintf(intToStr, "%d", end_line_number);
+            strcat(data, intToStr);
+            strcat(data, " <<<<<<<<<<<<");
+            strcat(data, newline);
+            strcat(data, file1_data);
+
+            break;
+        }
+
+        if(*(file1_data + i) == 10 && *(file2_data + i) == 10){
+            file1_data += i + 1;
+            file2_data += i + 1;
+            i = 0;
+            line_counter++;
+            continue;
+        }else if(*(file1_data + i) == 10 && *(file2_data + i) != 10){
+            int step = step_to(file2_data, 10);
+            strcat(data, "============ ");
+            strcat(data, "#");
+            sprintf(intToStr, "%d", line_counter);
+            strcat(data, intToStr);
+            strcat(data, " ============");
+            strcat(data, newline);
+            char tmp = *(file1_data + i);
+            *(file1_data + i) = '\0';
+            strcat(data, file1_data);
+            strcat(data, newline);
+            *(file1_data + i) = tmp;
+            file1_data += i + 1;
+            tmp = *(file2_data + step);
+            *(file2_data + step) = '\0';
+            strcat(data, file2_data);
+            strcat(data, newline);
+            *(file2_data + step) = tmp;
+            file2_data += step;
+            if(*file2_data != '\0'){
+                file2_data++;
+            }
+
+            i=0;
+            line_counter++;
+            continue;
+        }else if(*(file2_data + i) == 10 && *(file1_data + i) != 10){
+            int step = step_to(file1_data, 10);
+            strcat(data, "============ ");
+            strcat(data, "#");
+            sprintf(intToStr, "%d", line_counter);
+            strcat(data, intToStr);
+            strcat(data, " ============");
+            strcat(data, newline);
+            char tmp = *(file2_data + i);
+            *(file2_data + i) = '\0';
+            strcat(data, file2_data);
+            strcat(data, newline);
+            *(file2_data + i) = tmp;
+            file2_data += i + 1;
+            tmp = *(file1_data + step);
+            *(file1_data + step) = '\0';
+            strcat(data, file1_data);
+            strcat(data, newline);
+            *(file1_data + step) = tmp;
+            file1_data += step;
+            if(*file1_data != '\0'){
+                file1_data++;
+            }
+
+            i=0;
+            line_counter++;
+            continue;
+        }
+
+        if(*(file1_data + i) != *(file2_data + i)){
+            int step1 = step_to(file1_data, 10);
+            int step2 = step_to(file2_data, 10);
+            strcat(data, "============ ");
+            strcat(data, "#");
+            sprintf(intToStr, "%d", line_counter);
+            strcat(data, intToStr);
+            strcat(data, " ============");
+            strcat(data, newline);
+            char tmp = *(file1_data + step1);
+            *(file1_data + step1) = '\0';
+            strcat(data, file1_data);
+            strcat(data, newline);
+            *(file1_data + step1) = tmp;
+            file1_data += step1;
+            if(*file1_data != '\0'){
+                file1_data++;
+            }
+            tmp = *(file2_data + step2);
+            *(file2_data + step2) = '\0';
+            strcat(data, file2_data);
+            strcat(data, newline);
+            *(file2_data + step2) = tmp;
+            file2_data += step2;
+            if(*file2_data != '\0'){
+                file2_data++;
+            }
+
+            i=0;
+            line_counter++;
+            continue;
+        }
+        i++;
+    }
+    return data;
 }
 
 char * get_pos_of_index(char * path,int index){
@@ -1040,7 +1332,7 @@ char * get_string(char ** line, int effect_on_star, int offset){
 char * read_file(char * path){
     FILE *file = fopen(path, "r");
     char * data = (char *) malloc((MAX_STRING + 1) * sizeof(char));
-    *data = '1';
+    *data = '\0';
     int i = 0;
     while (-1) {
         *(data + i) = fgetc(file);
@@ -1056,8 +1348,9 @@ char * read_file(char * path){
 
 long long string_to_int(char * string, int lenght){
     long long in = 0;
-    int num;
+    int num ;
     for(int i = lenght-1; i >= 0; i--){
+        num = 0;
         char st = *(string + (lenght - i - 1));
         if(st == '0') num = 0;
         if(st == '1') num = 1;
@@ -1069,10 +1362,18 @@ long long string_to_int(char * string, int lenght){
         if(st == '7') num = 7;
         if(st == '8') num = 8;
         if(st == '9') num = 9;
-        in += pow(10 , i) * num;
+        in += pow_m(10 , i) * num;
     }
 
     return in;
+}
+
+long long pow_m(int x, int y){
+    long long m = 1;
+    for(int i = 0; i < y; i++){
+        m *= x;
+    }
+    return m;
 }
 
 void auto_indent(char ** line, char * path){
@@ -1104,9 +1405,11 @@ char * auto_indent_rec(char * file_data, int index_end, int blok_count){
             }
         }
         file_data += offset;
-        strcat(data, block_white);
-        strcat(data, file_data);
-        strcat(data, newline);
+        if(strlen(file_data) != 0){
+            strcat(data, block_white);
+            strcat(data, file_data);
+            strcat(data, newline);
+        }
     }else{
         int offset=0;
         while(-1){
@@ -1263,7 +1566,7 @@ char * tree(int depth, int depth_now, char * path){
     strcpy(data, "");
     strcpy(depth_them, "");
     for(int i = 1; i < depth_now; i++){
-        strcat(depth_them, "|____ ");
+        strcat(depth_them, "|___ ");
     }
     if (d)
     {
@@ -1291,7 +1594,22 @@ char * tree(int depth, int depth_now, char * path){
     return data;
 }
 
-void run(char * line, int is_undo){
+int number_of_digits (int n){
+    if (n < 10) return 1;
+    return 1 + number_of_digits (n / 10);
+}
+
+int arman_exist(char ** line){
+    char * arman = (char *)malloc((5) * sizeof(char));
+    sscanf(*line, "%s", arman);
+    if(strcmp(arman, "=D") == 0){
+        *line += 3;
+        return 1;
+    }
+    return 0;
+}
+
+void run(char * line, int is_undo, int is_arman, char * arman_data){
     char * command = (char *)malloc((MAX_LINE + 1) * sizeof(char));
     char * notAnalyzed = line;
 
@@ -1310,7 +1628,12 @@ void run(char * line, int is_undo){
     }else if(strcmp(command, "insertstr") == 0){
         char * path = get_path(&notAnalyzed);
         if(file_exist(path)){
-            char * string = get_string(&notAnalyzed, 0, 0);
+            char * string;
+            if(!is_arman){
+                string = get_string(&notAnalyzed, 0, 0);
+            }else{
+                string = arman_data;
+            }
             int pos_line;
             int pos_start;
             get_pos(&notAnalyzed, &pos_line, &pos_start);
@@ -1329,7 +1652,12 @@ void run(char * line, int is_undo){
     }else if(strcmp(command, "cat") == 0){
         char * path = get_path(&notAnalyzed);
         if(file_exist(path)){
-            puts(read_file(path));
+            char * data = read_file(path);
+            if(arman_exist(&notAnalyzed)){
+                run(notAnalyzed, 0, 1, data);
+            }else{
+                puts(data);
+            }
         }
     }else if(strcmp(command, "removestr") == 0){
         char * path = get_path(&notAnalyzed);
@@ -1410,6 +1738,9 @@ void run(char * line, int is_undo){
         int is_all = 0;
         char * string;
         char * path;
+        if(is_arman){
+            string = arman_data;
+        }
         while (-1)
         {
             if(*notAnalyzed != '-'){
@@ -1442,8 +1773,14 @@ void run(char * line, int is_undo){
                 }
             }
         }
+        char * data;
         if(file_exist(path)){
-            find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
+            data = find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
+            if(arman_exist(&notAnalyzed)){
+                run(notAnalyzed, 0, 1, data);
+            }else{
+                puts(data);
+            }
         }
     }else if(strcmp(command, "replace") == 0){
         char * args = (char *)malloc((MAX_FIND_ARGS + 1) * sizeof(char));
@@ -1452,6 +1789,9 @@ void run(char * line, int is_undo){
         char * string1;
         char * string2;
         char * path;
+        if(is_arman){
+            string1 = arman_data;
+        }
         while (-1)
         {
             if(*notAnalyzed != '-'){
@@ -1493,6 +1833,9 @@ void run(char * line, int is_undo){
         char * string;
         char * paths[MAX_MULTIPATHS];
         int paths_counter = 0;
+        if(is_arman){
+            string = arman_data;
+        }
         while (-1)
         {
             if(*notAnalyzed != '-'){
@@ -1520,7 +1863,12 @@ void run(char * line, int is_undo){
             }
         }
         if(multifile_exist(paths, paths_counter)){
-            grep(&notAnalyzed, paths, paths_counter, string, is_c, is_l);
+            char * data = grep(&notAnalyzed, paths, paths_counter, string, is_c, is_l);
+            if(arman_exist(&notAnalyzed)){
+                run(notAnalyzed, 0, 1, data);
+            }else{
+                printf("%s" ,data);
+            }
         }
     }else if(strcmp(command, "undo") == 0){
         char * path = get_path(&notAnalyzed);
@@ -1536,11 +1884,28 @@ void run(char * line, int is_undo){
         if(!is_undo){
             add_history(5, path, 0, old_data, "");
         }
+    }else if(strcmp(command, "compare") == 0){
+        char * path1 = get_path(&notAnalyzed);
+        char * path2 = get_path(&notAnalyzed);
+        char * data;
+        if(file_exist(path1) && file_exist(path2)) {
+            data = compare(&notAnalyzed, path1, path2);
+            if(arman_exist(&notAnalyzed)){
+                run(notAnalyzed, 0, 1, data);
+            }else{
+                puts(data);
+            }
+        }
     }else if(strcmp(command, "tree") == 0){
         int depth;
         sscanf(notAnalyzed, "%d", &depth);
+        notAnalyzed += number_of_digits(depth) + 1;
         char * trees = tree(depth, 1, "root/");
-        printf("%s", trees);
+        if(arman_exist(&notAnalyzed)){
+            run(notAnalyzed, 0, 1, trees);
+        }else{
+            printf("%s", trees);
+        }
     }
 }
 
@@ -1553,7 +1918,7 @@ int main()
         //get line
         fgets(line, MAX_LINE, stdin);
         line[strlen(line) - 1] = '\0';
-        run(line, 0);
+        run(line, 0, 0, "");
     }
     return 0;
 }
