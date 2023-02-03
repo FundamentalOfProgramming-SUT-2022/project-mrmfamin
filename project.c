@@ -37,7 +37,7 @@ void get_pos(char **line, int *pos_line, int *pos_start);
 void get_size(char **line, int *size);
 void get_bf(char **line, int *type);
 int step_to(char *line, char to);
-int file_exist(char *path);
+int file_exist(char *path, int mode);
 int folder_exist(char *path);
 void add_history(int type, char *path, int lenght, char *string, char *pos);
 int get_index_of_pos(char *path, int line, int start);
@@ -82,15 +82,15 @@ void createfile(char *path)
 
     // create file if not exist
     FILE *file_to_make;
-    if (file_exist(path_to_make))
+    if (file_exist(path_to_make, 0))
     {
         puts("File already exist");
     }
     else
     {
         file_to_make = fopen(path_to_make, "w");
+        fclose(file_to_make);
     }
-    fclose(file_to_make);
 }
 
 void add_string_to_file(char *path, char *string, int mode)
@@ -978,7 +978,7 @@ int step_to(char *line, char to)
     return i;
 }
 
-int file_exist(char *path)
+int file_exist(char *path, int mode)
 {
     FILE *check = fopen(path, "r");
     if (check)
@@ -1006,7 +1006,9 @@ int file_exist(char *path)
                 *(path_to_check + i) = '\0';
                 if (!folder_exist(path_to_check))
                 {
-                    puts("Invalid Address");
+                    if(mode){
+                        puts("Invalid Address");
+                    }
                     return 0;
                 }
             }
@@ -1014,7 +1016,9 @@ int file_exist(char *path)
             i++;
             path += 1;
         }
-        puts("File isn't exist");
+        if(mode){
+            puts("File isn't exist");
+        }
         return 0;
     }
 }
@@ -1939,7 +1943,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     else if (strcmp(command, "insertstr") == 0)
     {
         char *path = get_path(&notAnalyzed);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             char *string;
             if (!is_arman)
@@ -1970,7 +1974,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     else if (strcmp(command, "cat") == 0)
     {
         char *path = get_path(&notAnalyzed);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             char *data = read_file(path);
             if (arman_exist(&notAnalyzed))
@@ -1987,7 +1991,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     {
         char *path = get_path(&notAnalyzed);
         char *string;
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             int pos_line;
             int pos_start;
@@ -2011,7 +2015,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     else if (strcmp(command, "copystr") == 0)
     {
         char *path = get_path(&notAnalyzed);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             int pos_line;
             int pos_start;
@@ -2027,7 +2031,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     else if (strcmp(command, "cutstr") == 0)
     {
         char *path = get_path(&notAnalyzed);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             int pos_line;
             int pos_start;
@@ -2051,7 +2055,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     else if (strcmp(command, "pastestr") == 0)
     {
         char *path = get_path(&notAnalyzed);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             int pos_line;
             int pos_start;
@@ -2133,7 +2137,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
             }
         }
         char *data;
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             data = find(&notAnalyzed, path, string, is_count, is_byword, is_at, is_all);
             if (arman_exist(&notAnalyzed))
@@ -2198,7 +2202,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
             }
         }
         char *old_string;
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             old_string = replace(&notAnalyzed, path, string1, string2, is_at, is_all);
             if (!is_undo)
@@ -2271,7 +2275,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     else if (strcmp(command, "undo") == 0)
     {
         char *path = get_path(&notAnalyzed);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             undo(path);
         }
@@ -2280,7 +2284,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
     {
         char *path = get_path(&notAnalyzed);
         char *old_data = read_file(path);
-        if (file_exist(path))
+        if (file_exist(path, 1))
         {
             auto_indent(&notAnalyzed, path);
         }
@@ -2294,7 +2298,7 @@ void run(char *line, int is_undo, int is_arman, char *arman_data)
         char *path1 = get_path(&notAnalyzed);
         char *path2 = get_path(&notAnalyzed);
         char *data;
-        if (file_exist(path1) && file_exist(path2))
+        if (file_exist(path1, 1) && file_exist(path2, 1))
         {
             data = compare(&notAnalyzed, path1, path2);
             if (arman_exist(&notAnalyzed))
